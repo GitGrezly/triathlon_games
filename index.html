@@ -10,11 +10,13 @@
 <title>TRIATHLON GAMES!</title>
 <style>
   html,body{margin:0;height:100%;background:#000;overflow:hidden;overscroll-behavior:none;touch-action:none;-webkit-touch-callout:none;user-select:none;-webkit-user-select:none}
-  body{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
-  canvas{image-rendering:pixelated;width:min(100vw,calc(100vh * 16 / 9));width:min(calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right)),calc((100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 16 / 9));aspect-ratio:16/9;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+  body{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  canvas{image-rendering:pixelated;width:min(100vw,calc((100vh - var(--bar)) * 16 / 9));width:min(calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right)),calc((100dvh - var(--bar) - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 16 / 9));aspect-ratio:16/9;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
   #rot{display:none;position:fixed;inset:0;z-index:9;background:#000;color:#fcd800;font:bold 6vw monospace;align-items:center;justify-content:center;text-align:center}
   @media (orientation:portrait) and (pointer:coarse){#rot{display:flex}}
   #fstip{display:none;position:fixed;inset:0;z-index:10;background:rgba(0,0,0,.92);color:#fcd800;font:bold min(4vw,7vh) monospace;align-items:center;justify-content:center;text-align:center;padding:5vw;line-height:1.5}
+  :root{--bar:16px}
+  #ver{box-sizing:border-box;width:100%;height:var(--bar);line-height:var(--bar);text-align:center;color:#8a8aa0;background:#000;font:10px ui-monospace,Consolas,Menlo,monospace;white-space:nowrap;overflow:hidden;pointer-events:none}
 </style>
 <script>
 /* Bezoekersstatistiek met GoatCounter: geen cookies, geen namen. Vul hieronder je eigen code in. */
@@ -31,6 +33,7 @@
 </head>
 <body>
 <canvas id="c"></canvas>
+<div id="ver">Engine: Franca's Toeter-Turbo Version: 0x31337.V1.0.0.1</div>
 <div id="rot">DRAAI JE TELEFOON<br>(LIGGEND SPELEN)</div>
 <div id="fstip" onclick="this.style.display='none'">BEELDVULLEND SPELEN OP IPHONE:<br>TIK OP DELEN EN KIES 'ZET OP BEGINSCHERM'.<br>START HET SPEL DAARVANDAAN.<br>(TIK OM TE SLUITEN)</div>
 <script>
