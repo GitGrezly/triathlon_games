@@ -27,7 +27,7 @@ const MULT = [0.7, 1.8, 1.0];                     // kracht per klik per onderde
 const BASE_SPEED = 4.0;                           // tempo van de tegenstanders = jouw tempo bij ~3 klikken per seconde
 let CLICK_POWER = 2;                            // hoger = minder klikken nodig
 const PAR_S = MULT.map(m => m * BASE_SPEED);      // normale snelheid in eenheden per seconde
-const PAR_T = [12, 60, 36];                       // normale speltijd in seconden: 1 : 5 : 3
+const PAR_T = [20, 100, 60];                       // normale speltijd in seconden: 1 : 5 : 3
 const LEN = PAR_S.map((s, i) => Math.round(s * PAR_T[i]));
 const B1 = LEN[0], B2 = LEN[0] + LEN[1], TOTAL = B2 + LEN[2];
 const STARTS = [0, B1, B2];
@@ -682,11 +682,11 @@ function newRace() {
     { name: 'SCHILDPAD', col: '#00a800', hair: '#6a3a18', girl: true, base0: 0.93, shorts: '#1a5a2a' },
     { name: 'BOB', col: '#2038ec', hair: '#e8c050', base0: 1.02, shorts: '#181830' }
   ].map((r, i) => Object.assign(r, { dist: 0, speed: 0, ph: 0, ph0: i * 2.1, fin: null, napT: 0, napped: false, trd: [false, false], trT: 0 }));
-  const NB = [2, 8, 5]; BOTTLES = [];
+  const NB = [3, 13, 8]; BOTTLES = [];
   for (let s = 0; s < 3; s++) for (let k = 0; k < NB[s]; k++) BOTTLES.push({ d: STARTS[s] + LEN[s] * (k + 1) / (NB[s] + 1), got: false });
   HAZ = [];                                           // obstakels liggen tussen de flesjes in
   for (let s = 0; s < 3; s++) { const n = NB[s] + 1; for (let k = 0; k < n; k++) HAZ.push({ d: STARTS[s] + LEN[s] * (k + 0.5) / n, hit: false, i: HAZ.length }); }
-  FR = [17, 120, 250, 380, 520, 580].map(d => ({ d, nextT: 0, shoutT: 0 }));
+  FR = [[0, 0.5], [1, 0.2], [1, 0.5], [1, 0.8], [2, 0.4], [2, 0.8]].map(([s, f]) => ({ d: STARTS[s] + LEN[s] * f, nextT: 0, shoutT: 0 }));
   floats = []; parts = []; confetti = []; tr = null;
 }
 newRace();
@@ -817,7 +817,7 @@ function update(dt) {
   }
   if (racing) {
     for (const f of FR) if (Math.abs(P.dist - f.d) < 8 && T > f.nextT) { f.shoutT = 1.3; f.nextT = T + 3; sfx.joehoe(); }
-    for (const b of BOTTLES) if (!b.got && Math.abs(P.dist - b.d) < 1.0 && jumpH() > 12) {
+    for (const b of BOTTLES) if (!b.got && Math.abs(P.dist - b.d) < 1.0 && jumpH() > 17) {
       b.got = true; P.energy = Math.min(100, P.energy + 35); pop('+WATER', '#3cbcfc'); sfx.drink();
       burst(PX0, LANES[3] - 20 - jumpH(), ['#3cbcfc', '#fcfcfc', '#fcd800']);
     }
@@ -833,7 +833,7 @@ function update(dt) {
   for (const r of RIV) {
     if (r.trT > 0) { r.trT -= dt; r.speed = 0; continue; }
     const st = stageAt(r.dist);
-    if (r.nap && !r.napped && r.dist > 110) { r.napped = true; r.napT = 3; }
+    if (r.nap && !r.napped && r.dist > B1 + LEN[1] * 0.18) { r.napped = true; r.napT = 3; }
     const base = r.nap && r.napped ? 1.0 : r.base0;
     let target = MULT[st] * BASE_SPEED * base * (1 + 0.12 * Math.sin(T * 0.8 + r.ph0));
     if (r.napT > 0) { r.napT -= dt; target = 0; }
@@ -873,7 +873,8 @@ function drawBottles() {
   const y0 = LANES[3];
   for (const b of BOTTLES) {
     const sx = PX0 + (b.d - P.dist) * PXU; if (b.got || sx < -10 || sx > W + 10) continue;
-    const by = y0 - 36 + Math.round(Math.sin(T * 4 + b.d) * 1.5);
+    const by = y0 - 48 + Math.round(Math.sin(T * 4 + b.d) * 1.5);
+    rect(sx - 1, by + 14, 2, y0 - by - 14, 'rgba(60,188,252,0.22)');
     spr(BOTTLE, { c: '#f83800', b: '#3cbcfc', w: '#fcfcfc', k: '#101830', r: '#f87890' }, sx - 4, by);
     if ((T * 6 | 0) % 2) { px(sx + 6, by + 2, '#fcfcfc'); px(sx - 6, by + 6, '#fcfcfc'); }
     const ah = b.d - P.dist; if (ah > 0.5 && ah < 6 && (T * 5 | 0) % 2 === 0) stext('SPRING!', Math.round(sx - tw('SPRING!') / 2), by - 9, '#3cbcfc');
@@ -1089,7 +1090,7 @@ function drawSelect() {
   });
   const ctl = '< > = KIEZEN   ENTER = DOOR';
   stext(ctl, Math.round((W - tw(ctl)) / 2), 164, '#fcfcfc');
-  stext('1 UUR ZWEMMEN + 5 UUR FIETSEN + 3 UUR LOPEN, MAAR DAN IN 2 MINUTEN!', Math.round((W - tw('1 UUR ZWEMMEN + 5 UUR FIETSEN + 3 UUR LOPEN, MAAR DAN IN 2 MINUTEN!')) / 2), 172, '#d8d8e8');
+  const tl = '1 UUR ZWEMMEN + 5 UUR FIETSEN + 3 UUR LOPEN, MAAR DAN IN 3 MINUTEN!'; stext(tl, Math.round((W - tw(tl)) / 2), 172, '#d8d8e8');
 }
 function drawLevel() {
   bands(['#202058', '#2c2c78', '#383898', '#4848b8'], 0, H);
