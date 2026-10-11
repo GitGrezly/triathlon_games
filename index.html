@@ -2,19 +2,25 @@
 <html lang="nl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-fullscreen">
+<meta name="theme-color" content="#000000">
 <title>TRIATHLON GAMES!</title>
 <style>
-  html,body{margin:0;height:100%;background:#000;overflow:hidden}
-  body{display:flex;align-items:center;justify-content:center}
-  canvas{image-rendering:pixelated;width:min(100vw,calc(100vh * 16 / 9));aspect-ratio:16/9;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:#000;overflow:hidden;overscroll-behavior:none;touch-action:none;-webkit-touch-callout:none;user-select:none;-webkit-user-select:none}
+  body{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+  canvas{image-rendering:pixelated;width:min(100vw,calc(100vh * 16 / 9));width:min(calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right)),calc((100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 16 / 9));aspect-ratio:16/9;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
   #rot{display:none;position:fixed;inset:0;z-index:9;background:#000;color:#fcd800;font:bold 6vw monospace;align-items:center;justify-content:center;text-align:center}
   @media (orientation:portrait) and (pointer:coarse){#rot{display:flex}}
+  #fstip{display:none;position:fixed;inset:0;z-index:10;background:rgba(0,0,0,.92);color:#fcd800;font:bold min(4vw,7vh) monospace;align-items:center;justify-content:center;text-align:center;padding:5vw;line-height:1.5}
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
 <div id="rot">DRAAI JE TELEFOON<br>(LIGGEND SPELEN)</div>
+<div id="fstip" onclick="this.style.display='none'">BEELDVULLEND SPELEN OP IPHONE:<br>TIK OP DELEN EN KIES 'ZET OP BEGINSCHERM'.<br>START HET SPEL DAARVANDAAN.<br>(TIK OM TE SLUITEN)</div>
 <script>
 'use strict';
 /* TRIATHLON GAMES! - 8-bit klik-spel voor kinderen. Intern 320x180, geschaald met pixelated rendering. */
@@ -27,22 +33,31 @@ const MULT = [0.7, 1.8, 1.0];                     // kracht per klik per onderde
 const BASE_SPEED = 4.0;                           // tempo van de tegenstanders = jouw tempo bij ~3 klikken per seconde
 let CLICK_POWER = 2;                            // hoger = minder klikken nodig
 const PAR_S = MULT.map(m => m * BASE_SPEED);      // normale snelheid in eenheden per seconde
-const PAR_T = [20, 100, 60];                       // normale speltijd in seconden: 1 : 5 : 3
-const LEN = PAR_S.map((s, i) => Math.round(s * PAR_T[i]));
-const B1 = LEN[0], B2 = LEN[0] + LEN[1], TOTAL = B2 + LEN[2];
-const STARTS = [0, B1, B2];
-const REAL_KM = [3.8, 180, 42.2], REAL_H = [1, 5, 3];
-const TIME_SCALE = 3600 * REAL_H[0] / PAR_T[0];   // 1 speelseconde = 300 echte seconden
+let PAR_T, LEN, B1, B2, TOTAL, STARTS, REAL_KM, REAL_H, TIME_SCALE, HALF = false;                       // normale speltijd in seconden: 1 : 5 : 3
+function setCourse(half) {                         // hele of halve triathlon: zelfde verhoudingen 1 : 5 : 3
+  HALF = half; PAR_T = half ? [10, 50, 30] : [20, 100, 60];
+  LEN = PAR_S.map((s, i) => Math.round(s * PAR_T[i]));
+  B1 = LEN[0]; B2 = LEN[0] + LEN[1]; TOTAL = B2 + LEN[2]; STARTS = [0, B1, B2];
+  REAL_KM = half ? [1.9, 90, 21.1] : [3.8, 180, 42.2]; REAL_H = half ? [0.5, 2.5, 1.5] : [1, 5, 3];
+  TIME_SCALE = 3600 * REAL_H[0] / PAR_T[0];          // 1 speelseconde = 180 echte seconden
+}
+setCourse(false);
+
+
+
+   // 1 speelseconde = 300 echte seconden
 const STAGE_NAME = ['ZWEMMEN', 'FIETSEN', 'HARDLOPEN'];
 const PXU = 12, PX0 = 96, JT = 0.95, JH = 26, WHEELIE_T = 1.2;
 const LANES = [146, 153, 160, 168];               // y van de voeten per baan; speler in de voorste baan
 const GRAD = ['#d82800', '#f83800', '#fc7c30', '#fcb830', '#fcf050'];
 const stageAt = d => d < B1 ? 0 : d < B2 ? 1 : 2;
 const LOCS = {
-  kona: { name: 'KONA', sub: 'HAWAII', tint: 'rgba(60,20,50,0.62)', cap: 'ZONSONDERGANG, LAVA EN PALMEN' },
-  ffm: { name: 'FRANKFURT', sub: 'DUITSLAND', tint: 'rgba(20,90,130,0.6)', cap: 'MEER, SKYLINE EN WINDMOLENS' }
+  kona: { name: 'KONA', sub: 'HAWAII', tint: 'rgba(60,20,50,0.62)', cap: ['ZONSONDERGANG', 'LAVA, PALMEN'], facts: ['LAVA EN PALMEN', 'ZEEZWEMMEN', 'VLAK PARCOURS'] },
+  ffm: { name: 'FRANKFURT', sub: 'DUITSLAND', tint: 'rgba(20,90,130,0.6)', cap: ['SKYLINE, MEER', 'EN WINDMOLENS'], facts: ['MEER EN SKYLINE', 'WINDMOLENS', 'VLAK PARCOURS'] },
+  gb: { name: 'GERAARDSBERGEN', sub: 'BELGIE', tint: 'rgba(60,70,40,0.6)', cap: ['KASSEIEN EN', 'KAPELMUUR'], facts: ['KASSEIEN', 'DE MUUR!', 'BERGOP = KLIKKEN'], half: true },
+  kr: { name: 'KRAICHGAU', sub: 'DUITSLAND', tint: 'rgba(10,80,100,0.6)', cap: ['LAND VAN DE', '1000 HEUVELS'], facts: ['WIJNGAARDEN', 'KASTEEL', 'OP EN NEER!'], half: true }
 };
-const LOC_KEYS = ['kona', 'ffm'];
+const LOC_KEYS = ['kona', 'ffm', 'gb', 'kr'];
 let LOC = 'kona', sel = 0;
 const DIFFS = [                                  // hoger power = minder klikken nodig
   { name: 'MAKKELIJK', power: 3.0, cps: '2', col: '#00d800', tip: 'RUSTIG AAN' },
@@ -50,7 +65,7 @@ const DIFFS = [                                  // hoger power = minder klikken
   { name: 'MOEILIJK', power: 1.2, cps: '5', col: '#fc8020', tip: 'FLINK DOORKLIKKEN' },
   { name: 'EXPERT', power: 0.85, cps: '7', col: '#f83020', tip: 'SUPER SNEL!' }
 ];
-let DIFF = 1, TOUCH = false;
+let DIFF = 1, TOUCH = matchMedia('(pointer:coarse)').matches;
 try { const dv = localStorage.getItem('triathlonDiff'); if (dv !== null && +dv >= 0 && +dv < DIFFS.length) DIFF = +dv; } catch (e) { /* geen opslag */ }
 
 // ---------- tekenhulp
@@ -175,7 +190,7 @@ const DROP = ['...k...', '..kbk..', '..kbk..', '.kbbbk.', 'kbwbbbk', 'kbbbbbk', 
 const DUCK = ['....yy...', '...yyyy..', '...ykyoo.', 'yy.yyyy..', 'yyyyyyy..', '.yyyyy...'];
 const JELLY = ['..ppppp..', '.ppppppp.', 'pppwpwppp', 'ppppppppp', '.p.p.p.p.', '.p.p.p.p.', '..p...p..'];
 const CONE = ['...o...', '..ooo..', '..www..', '.ooooo.', '.wwwww.', 'ooooooo', 'ooooooo'];
-const BANANA = ['y.......y', 'yy.....yy', '.yyyyyyy.', '..yyyyy..', '...bbb...'];
+const POOP = ['....dd....', '...dbbd...', '..dblbbd..', '.dbbbbbbd.', '.dbwkbwkd.', '.dbbbbbbd.', 'dbbbbbbbbd', 'dbllbbbbbd', 'dddddddddd'];
 const STAR = ['...x...', '..xxx..', 'xxxxxxx', '.xxxxx.', '..xxx..', '.xx.xx.', '.x...x.'];
 const SKIN = '#fcc89c', SKIN_D = '#d89870';
 
@@ -461,9 +476,9 @@ function bgBike() {
     const bx = x + 300;
     rect(bx + 10, 76, 5, 76, '#7a7a88'); rect(bx + 10, 76, 1, 76, '#b0b0c0');
     rect(bx - 6, 40, 62, 40, '#202030'); rect(bx - 5, 41, 60, 38, '#fcfcfc');
-    text('DRINK', bx + 8, 45, '#202030', 3); text('WATER HIER!', bx + 3, 66, '#d82800');
+    text('DRINK', bx + 6, 45, '#202030', 2); text('WATER HIER!', bx + 4, 67, '#d82800');
     ['#d82800', '#f88020', '#fcd800', '#00a800', '#2038ec'].forEach((c, k) => rect(bx - 5 + k * 12, 74, 12, 4, c));
-    spr(DROP, { b: '#3cbcfc', w: '#fcfcfc', k: '#0058f8' }, bx + 44, 45);
+    spr(DROP, { b: '#3cbcfc', w: '#fcfcfc', k: '#0058f8' }, bx + 22, 57);
   });
   each(760, 1, (x, i) => { if (rnd(i + 7) > 0.35) mascot(x + 520, 150); });
 }
@@ -643,9 +658,11 @@ function bgRunF() {
 // ---------- wisselzone
 function bgTrans() {
   const k = LOC === 'kona';
-  bands(k ? ['#3c78e0', '#5c94fc', '#80b4fc', '#a8d0fc'] : ['#4a9cf0', '#72b8f8', '#9cd0fc', '#c4e4fc'], 0, 114);
+  bands(LOC === 'gb' ? ['#8a9cb0', '#a2b2c2', '#bcc8d4', '#d2dae2'] : k ? ['#3c78e0', '#5c94fc', '#80b4fc', '#a8d0fc'] : ['#4a9cf0', '#72b8f8', '#9cd0fc', '#c4e4fc'], 0, 114);
   cloud(30, 14); cloud(190, 24); cloud(262, 8);
   if (k) { mount(70, 114, 34, '#4868c8'); mount(240, 114, 44, '#4868c8'); mount(160, 118, 24, '#38284c', '#e84818'); palm(24, 122, 46, '#7c4c1c', '#00a800'); palm(298, 122, 50, '#7c4c1c', '#00a800'); palm(310, 122, 36, '#7c4c1c', '#00a800'); }
+  else if (LOC === 'gb') { each(26, 0, (x, i) => gable(x, 118, 24, 22 + (rnd(i) * 14 | 0), ['#b8603c', '#c87848', '#a85030', '#d8a070'][((i % 4) + 4) % 4])); belfry(250, 118); flag(30, 96); flag(290, 96); }
+  else if (LOC === 'kr') { mount(60, 116, 36, '#6ab048'); mount(250, 116, 50, '#5aa040'); castle(236, 70); fachwerk(8, 118, 4); }
   else { skyline(0, 108, '#8ca4c8', '#d0dcf0', 31); each(18, 0, (x, i) => fir(x, 118, 22 + (rnd(i) * 16 | 0), '#2a7040', '#3a9054')); }
   rect(0, 118, W, 62, '#58b848');
   for (let y = 118; y < 180; y += 6) rect(0, y, W, 3, '#4ea840');
@@ -657,7 +674,241 @@ function bgTrans() {
   [['#d82800', 112], ['#fcd800', 140], ['#00a800', 168], ['#f83cc0', 196], ['#f88020', 224]].forEach(b => at(b[1], 134, 0.75, () => bikeFrame(0, 0, 0, b[0])));
   rect(0, 150, W, 30, '#b84028'); for (let x = 0; x < W; x += 24) rect(x, 150, 12, 1, '#e08060');
 }
-const BGS = { kona: [bgSwim, bgBike, bgRun], ffm: [bgSwimF, bgBikeF, bgRunF] };
+// ---------- terrein: bergop = harder klikken, bergaf = lekker snel
+const bump = (f, a, b, c) => f < a || f > c ? 0 : f < b ? ease((f - a) / (b - a)) : 1 - ease((f - b) / (c - b));
+const TERRAIN = {
+  gb: d => {                                       // de Muur (en een tweede berg) op de fiets, een klim in de stad
+    const s = stageAt(d); if (s === 0) return 0; const f = (d - STARTS[s]) / LEN[s];
+    return s === 1 ? 40 * bump(f, 0.57, 0.61, 0.70) + 22 * bump(f, 0.80, 0.84, 0.90) + 3 * Math.sin(f * 60) : 16 * bump(f, 0.35, 0.40, 0.50) + 2 * Math.sin(f * 30);
+  },
+  kr: d => {                                       // 1000 heuvels: steeds op en neer
+    const s = stageAt(d); if (s === 0) return 0; const f = (d - STARTS[s]) / LEN[s];
+    return s === 1 ? 16 * Math.sin(f * Math.PI * 14) : 9 * Math.sin(f * Math.PI * 8);
+  }
+};
+const terrain = d => TERRAIN[LOC] ? TERRAIN[LOC](d) : 0;
+const grade = d => Math.max(-1.3, Math.min(1.3, (terrain(d + 0.5) - terrain(d - 0.5)) / PXU / 0.06));
+const wx = d => PX0 + d * PXU - CAM;                // schermpositie van een plek in de wereld
+function ridge(base, col, hl) {                    // heuvelrug die het parcours volgt
+  for (let x = 0; x < W; x += 2) {
+    const t = Math.round(base - terrain((CAM + x - PX0) / PXU));
+    rect(x, t, 2, base - t + 40, col); if (hl) rect(x, t, 2, 2, hl);
+  }
+}
+function cobbles(y0, y1, base) {
+  for (let y = y0, r = 0; y < y1; y += 4, r++) {
+    rect(0, y, W, 4, base);
+    each(7, 1, (x, i) => { const v = rnd(i * 3.1 + r * 7.7); rect(x + (r % 2) * 3, y + 1, 5, 3, v > 0.66 ? '#8a8078' : v > 0.33 ? '#7a7068' : '#6a625a'); });
+  }
+}
+function poplar(x, base, h) { rect(x + 1, base - 6, 2, 6, '#5a4a30'); for (let k = 0; k < 4; k++) circ(x + 2, base - 10 - k * Math.round(h / 4), k > 2 ? 3 : 5, k % 2 ? '#3a8a3a' : '#2e7a30'); }
+
+// ---------- GERAARDSBERGEN (Belgie): kasseien, trapgevels, Manneken Pis en de Muur met de kapel
+function flag(x, y) {
+  rect(x, y, 1, 16, '#6a5a4a'); const w = Math.round(Math.sin(T * 6 + x * 0.3));
+  rect(x + 1, y + 1, 11, 8, '#fcd800'); rect(x + 4, y + 3 + w, 5, 4, '#181818'); px(x + 3, y + 3, '#181818'); px(x + 9, y + 2, '#181818'); px(x + 10, y + 6, '#181818');
+}
+function fan(x, y, i) { person(x, y, i); if (rnd(i + 50) > 0.55) flag(x + 8, y - 31); }
+function gable(x, base, w, h, col) {               // huis met trapgevel
+  const dk = shade(col, 0.78), sw = Math.max(2, Math.floor(w / 9));
+  rect(x, base - h, w, h, col); rect(x, base - h, w, 1, dk);
+  for (let s = 0; s < 4; s++) { rect(x + s * sw, base - h - (s + 1) * 3, w - 2 * s * sw, 3, col); rect(x + s * sw, base - h - (s + 1) * 3, w - 2 * s * sw, 1, dk); }
+  for (let wy = base - h + 5; wy < base - 9; wy += 9) for (let wx2 = x + 3; wx2 < x + w - 4; wx2 += 7) { rect(wx2, wy, 4, 5, '#f4f0e0'); rect(wx2 + 1, wy + 1, 2, 3, '#38506a'); }
+  rect(x + (w >> 1) - 2, base - 7, 4, 7, '#503020');
+}
+function belfry(x, base) {                         // belfort
+  rect(x, base - 70, 14, 70, '#c8b890'); rect(x, base - 70, 3, 70, '#a89870'); rect(x + 3, base - 62, 8, 10, '#503828');
+  circ(x + 7, base - 46, 4, '#f4f0e0'); px(x + 7, base - 46, '#202020'); px(x + 7, base - 48, '#202020');
+  for (let r = 0; r < 22; r++) { const hw = Math.round(r * 0.32); rect(x + 7 - hw, base - 92 + r, hw * 2 + 1, 1, '#4a5a6a'); }
+  rect(x + 7, base - 98, 1, 6, '#fcd800');
+}
+function mannekenPis(x, base) {
+  const sk = SKIN;
+  rect(x - 8, base - 4, 30, 4, '#8a8a92'); rect(x, base - 14, 12, 10, '#9a9aa4'); rect(x - 2, base - 16, 16, 3, '#b0b0b8');
+  rect(x + 4, base - 24, 2, 8, sk); rect(x + 7, base - 24, 2, 8, sk); rect(x + 3, base - 32, 7, 9, sk);
+  rect(x + 4, base - 38, 5, 6, sk); rect(x + 4, base - 39, 5, 2, '#503000');
+  for (let k = 0; k < 9; k++) px(x + 10 + k, base - 22 + Math.round(k * k * 0.14), (T * 8 + k | 0) % 2 ? '#a8d8f8' : '#fcfcfc');
+  text('MANNEKEN PIS', x + 6 - 23, base + 3, '#fcfcfc');
+}
+function chapel(x, y) {                            // kapel op de top van de Muur (x = midden, y = voet)
+  rect(x - 10, y - 14, 20, 14, '#f0ece0'); rect(x - 10, y - 14, 4, 14, '#d0c8b8');
+  for (let r = 0; r < 10; r++) { const hw = Math.round(12 * (r + 1) / 10); rect(x - hw, y - 24 + r, hw * 2, 1, '#8a4a30'); }
+  rect(x + 10, y - 30, 7, 30, '#f0ece0'); rect(x + 10, y - 30, 2, 30, '#d0c8b8');
+  for (let r = 0; r < 8; r++) { const hw = Math.round(5 * (r + 1) / 8); rect(x + 13 - hw, y - 38 + r, hw * 2, 1, '#486078'); }
+  rect(x + 13, y - 44, 1, 6, '#e8c840'); rect(x + 11, y - 42, 5, 1, '#e8c840');
+  rect(x - 3, y - 8, 6, 8, '#503828'); rect(x - 8, y - 11, 3, 5, '#4a6a8a'); rect(x + 5, y - 11, 3, 5, '#4a6a8a');
+}
+function windmill(x, base) {
+  for (let r = 0; r < 30; r++) { const hw = 8 - Math.round(r * 0.13); rect(x - hw, base - 30 + r, hw * 2, 1, r < 4 ? '#8a4a30' : '#d8c8a8'); }
+  rect(x - 6, base - 33, 12, 3, '#8a4a30'); rect(x - 2, base - 8, 4, 8, '#503020');
+  const a = T * 0.8 + x * 0.01;
+  for (let k = 0; k < 4; k++) { const t = a + k * Math.PI / 2; thick(x, base - 30, x + Math.cos(t) * 20, base - 30 + Math.sin(t) * 20, 2, '#a89878'); }
+}
+function roadSign(sx, l1, l2, col) {              // bord met naam en percentage; alles past binnen het bord
+  rect(sx - 1, 100, 3, 46, '#6a6a76'); rect(sx - 27, 78, 54, 24, '#202030'); rect(sx - 26, 79, 52, 22, col);
+  text(l1, sx - (tw(l1) >> 1), 83, '#fcfcfc'); text(l2, sx - (tw(l2, 2) >> 1), 90, '#fcfcfc', 2);
+}
+function shopG(x, base, i) {
+  const k = ((i % 3) + 3) % 3, L = ['MATTENTAART', 'FRIETEN', 'CAFE & BIER'][k];
+  gable(x, base, 56, 34, ['#c87848', '#b8603c', '#d8a070'][k]);
+  rect(x + 4, base - 24, 48, 11, '#2a2018'); text(L, x + 28 - (tw(L) >> 1), base - 22, '#fcd800');
+  for (let j = 0; j < 6; j++) rect(x + 4 + j * 8, base - 13, 8, 3, j % 2 ? '#fcd800' : '#181818');
+}
+function bunting(x, y, n) {
+  for (let k = 0; k < n; k++) {
+    const xx = x + k * 7, yy = y + Math.round(Math.sin(k / n * Math.PI) * 6), c = ['#fcd800', '#181818', '#d82020'][k % 3];
+    rect(xx, yy, 6, 1, '#404040'); rect(xx, yy + 1, 5, 2, c); rect(xx + 1, yy + 3, 3, 1, c); px(xx + 2, yy + 4, c);
+  }
+}
+function bgSwimG() {
+  const hz = 124, GC = ['#b8603c', '#c87848', '#a85030', '#d8a070', '#8a4a38'];
+  bands(['#8a9cb0', '#a2b2c2', '#bcc8d4', '#d2dae2', '#e4e8ec', '#f0eee8'], 0, hz);
+  each(160, 0.05, (x, i) => cloud(x, 6 + (rnd(i) * 40 | 0)));
+  each(120, 0.08, (x, i) => mount(x + 60, hz - 14, 16 + (rnd(i) * 14 | 0), '#8aa088'));
+  each(125, 0.12, (x, i) => { for (let k = 0; k < 5; k++) gable(x + k * 25, hz - 2, 23, 22 + ((rnd(i * 5 + k) * 18) | 0), GC[((i + k) % 5 + 5) % 5]); });
+  each(500, 0.12, (x, i) => { if (rnd(i + 4) > 0.2) belfry(x + 130, hz - 2); });
+  each(14, 0.2, (x, i) => poplar(x, hz + 1, 22 + (rnd(i + 7) * 12 | 0)));
+  each(700, 0.25, (x, i) => { if (rnd(i + 9) > 0.3) mannekenPis(x + 150, hz + 3); });
+  rect(0, hz - 2, W, 6, '#6a7a58');
+  bands(['#5e7e6a', '#58786a', '#527266', '#4c6c62', '#46665e', '#406058'], hz + 4, H - hz - 4);
+  const rip = ['#c8dcc8', '#b0ccb4', '#9ab8a0', '#88a890', '#789880', '#688870', '#587860', '#486850'];
+  for (let k = 0; k < 8; k++) { const y = Math.round(hz + 5 + k * k * 0.45 + k * 3.5); each(9 + k * 3, 0.2 + k * 0.12, (x, i) => { if (rnd(i * 5 + k) > 0.35) rect(x, y, 4 + k, 1, rip[k]); }); }
+  each(300, 0.9, (x, i) => { if (rnd(i + 4) > 0.3) duck(x, 130 + (rnd(i) * 8 | 0)); });
+  each(420, 1, (x, i) => {
+    if (rnd(i + 3) <= 0.3) return;
+    const bx = x + 120, by = 146;
+    rect(bx - 1, by - 30, 20, 32, '#202020'); rect(bx, by - 29, 18, 30, '#f8d800'); rect(bx + 14, by - 29, 4, 30, '#d8a800');
+    rect(bx + 3, by - 22, 12, 10, '#181818'); text('1', bx + 6, by - 20, '#f8d800', 2); rect(bx - 6, by + 1, 30, 2, 'rgba(255,255,255,0.7)');
+  });
+  for (let i = 0; i < 3; i++) each(10, 1, (x, j) => rect(x, LANES[i] + 6, 3, 2, j % 2 ? '#181818' : '#f8d800'));
+}
+function bgBikeG() {
+  const hz = 108, muurS = B1 + LEN[1] * 0.57, muurE = B1 + LEN[1] * 0.61, bosS = B1 + LEN[1] * 0.80;
+  bands(['#8a9cb0', '#a2b2c2', '#bcc8d4', '#d2dae2'], 0, hz);
+  each(150, 0.07, (x, i) => cloud(x, 8 + (rnd(i) * 36 | 0)));
+  each(130, 0.18, (x, i) => mount(x + 65, hz, 14 + (rnd(i) * 12 | 0), '#8aa488'));
+  each(700, 0.3, (x, i) => { if (rnd(i + 6) > 0.3) windmill(x + 200, hz + 6); });
+  ridge(hz + 8, '#5a9a48', '#7ab85a');
+  for (let x = 0; x < W; x += 2) { const d = (CAM + x - PX0) / PXU; if (grade(d) > 0.6) rect(x, Math.round(hz + 8 - terrain(d)) + 4, 2, 5, '#9a8a78'); }
+  each(30, 0.9, (x, i) => rect(x, 120 + (rnd(i) * 22 | 0), 14, 2, '#4a8a3a'));
+  each(80, 0.93, (x, i) => { if (rnd(i + 2) > 0.5) poplar(x, 140, 22 + (rnd(i) * 10 | 0)); });
+  { const sx = wx(muurE); if (sx > -40 && sx < W + 40) chapel(Math.round(sx), Math.round(hz + 8 - terrain(muurE)) + 2); }
+  each(110, 1, (x, i) => { if (rnd(i + 12) > 0.5) flag(x, 128); });
+  each(12, 1, (x, i) => { const f = ((CAM + x - PX0) / PXU - B1) / LEN[1]; if (rnd(i + 40) > (f > 0.5 && f < 0.64 ? 0.12 : 0.8)) fan(x, 142, i); });
+  cobbles(146, H, '#4a443e');
+  for (const [d, a, b2] of [[muurS - 6, 'KAPELMUUR', '20%'], [bosS - 6, 'BOSBERG', '12%']]) { const sx = wx(d); if (sx > -60 && sx < W + 60) roadSign(Math.round(sx), a, b2, '#c82820'); }
+}
+function bgRunG() {
+  const GC = ['#b8603c', '#c87848', '#a85030', '#d8a070', '#8a4a38', '#c0a070'];
+  bands(['#8a9cb0', '#a2b2c2', '#bcc8d4', '#d2dae2'], 0, 118);
+  each(150, 0.1, (x, i) => cloud(x, 8 + (rnd(i + 4) * 30 | 0)));
+  each(540, 0.45, (x, i) => { if (rnd(i + 8) > 0.15) belfry(x + 120, 118); });
+  each(150, 0.6, (x, i) => { for (let k = 0; k < 6; k++) gable(x + k * 25, 118, 23, 22 + ((rnd(i * 7 + k) * 20) | 0), GC[((i + k) % 6 + 6) % 6]); });
+  rect(0, 118, W, 28, '#a89a86');
+  each(480, 0.85, (x, i) => shopG(x, 126, i));
+  each(150, 0.9, (x, i) => bunting(x, 70, 20));
+  each(1100, 0.9, (x, i) => { if (rnd(i + 3) > 0.3) mannekenPis(x + 300, 130); });
+  each(11, 1, (x, i) => { if (rnd(i) > 0.15) fan(x, 138, i); });
+  each(130, 1, (x, i) => table(x, 134, i));
+  cobbles(146, H, '#4a443e');
+}
+
+// ---------- KRAICHGAU (Duitsland): land van de 1000 heuvels, wijngaarden, kasteel en asperges
+function hillFields(base) {                        // heuvels met wijngaarden en koolzaad die het parcours volgen
+  ridge(base, '#6ab048', '#9ae060');
+  for (let x = 0; x < W; x += 2) {
+    const wxp = CAM + x - PX0, t = Math.round(base - terrain(wxp / PXU)), typ = rnd(Math.floor(wxp / 84) * 3.3 + 1);
+    rect(x, t + 2, 2, 16, typ > 0.66 ? '#f2d41c' : typ > 0.33 ? ((Math.floor(wxp / 3) % 2) ? '#2e8a30' : '#58b048') : '#86c254');
+    if (typ > 0.66 && x % 6 === 0) px(x, t + 6 + (x % 5), '#f8a820');
+  }
+}
+function castle(x, base) {
+  rect(x, base - 24, 36, 24, '#b8a890'); rect(x, base - 24, 36, 2, '#d0c4ac');
+  for (let k = 0; k < 6; k++) rect(x + k * 6, base - 28, 4, 4, '#b8a890');
+  for (const tx of [x - 6, x + 30]) {
+    rect(tx, base - 40, 12, 40, '#a89880');
+    for (let r = 0; r < 10; r++) rect(tx + 6 - r, base - 52 + r, r * 2 + 1, 1, '#a83a28');
+    rect(tx + 5, base - 58, 1, 6, '#505050'); rect(tx + 6, base - 58, 4, 3, '#d82800'); rect(tx + 4, base - 32, 4, 6, '#383028');
+  }
+  rect(x + 14, base - 14, 8, 14, '#483828');
+}
+function sailboat(x, y) {
+  rect(x, y, 18, 3, '#e8e8f0'); rect(x + 2, y + 3, 14, 1, '#a8b0c0'); rect(x + 9, y - 20, 1, 20, '#505050');
+  for (let r = 0; r < 16; r++) rect(x + 10, y - 18 + r, Math.round(r * 0.6) + 1, 1, '#fcfcfc');
+  rect(x + 9, y - 22, 4, 2, '#d82800');
+}
+function spargel(x, y) {                           // aspergemannetje langs de weg
+  const wv = Math.sin(T * 6) * 2;
+  rect(x + 3, y - 36, 8, 34, '#f4f0d8'); rect(x + 3, y - 36, 1, 34, '#d8d0b0'); rect(x + 10, y - 36, 1, 34, '#d8d0b0');
+  rect(x + 4, y - 42, 6, 6, '#a070c0'); rect(x + 5, y - 44, 4, 3, '#8a5ab0');
+  px(x + 5, y - 30, '#000'); px(x + 9, y - 30, '#000'); rect(x + 6, y - 27, 3, 1, '#a04030');
+  thick(x + 3, y - 22, x - 2, y - 26 + wv, 2, '#f4f0d8'); thick(x + 11, y - 22, x + 16, y - 28 - wv, 2, '#f4f0d8');
+  rect(x + 4, y - 3, 3, 3, '#2038ec'); rect(x + 8, y - 3, 3, 3, '#2038ec');
+}
+function stall(x, y) {                             // kraampje met asperges
+  rect(x, y - 26, 3, 26, '#6a4a30'); rect(x + 40, y - 26, 3, 26, '#6a4a30');
+  for (let k = 0; k < 7; k++) rect(x - 2 + k * 7, y - 34, 7, 8, k % 2 ? '#fcfcfc' : '#d82020');
+  rect(x + 3, y - 20, 37, 7, '#fcfcfc'); text('SPARGEL', x + 21 - (tw('SPARGEL') >> 1), y - 18, '#2a7a2a');
+  rect(x + 3, y - 10, 37, 10, '#a06a3a'); for (let k = 0; k < 8; k++) rect(x + 5 + k * 4, y - 14, 2, 5, '#f4f0d8');
+}
+function bgSwimK() {
+  const hz = 124;
+  bands(['#4a9cf0', '#6cb4f8', '#90ccfc', '#b4e0fc', '#d8f0fc', '#f8f4d8'], 0, hz);
+  each(150, 0.06, (x, i) => cloud(x, 6 + (rnd(i) * 40 | 0)));
+  each(170, 0.06, (x, i) => mount(x + 85, hz - 12, 22 + (rnd(i) * 20 | 0), '#7aa8c0'));
+  each(130, 0.1, (x, i) => mount(x + 65, hz - 6, 16 + (rnd(i + 3) * 14 | 0), '#5a9a58'));
+  each(520, 0.1, (x, i) => { if (rnd(i + 2) > 0.3) castle(x + 100, hz - 14); });
+  each(14, 0.14, (x, i) => fir(x, hz + 1, 16 + (rnd(i + 5) * 14 | 0), '#2a6a3a', '#3a8a4a'));
+  rect(0, hz, W, 3, '#d8c890');
+  bands(['#3a9cb8', '#3490b0', '#2c80a0', '#247090', '#1c6080', '#185070'], hz + 3, H - hz - 3);
+  const rip = ['#d0f0fc', '#c0e8fc', '#b0e0fc', '#98d0f4', '#80c0e8', '#68b0dc', '#50a0d0', '#4090c4'];
+  for (let k = 0; k < 8; k++) { const y = Math.round(hz + 5 + k * k * 0.45 + k * 3.5); each(9 + k * 3, 0.2 + k * 0.12, (x, i) => { if (rnd(i * 5 + k) > 0.35) rect(x, y, 4 + k, 1, rip[k]); }); }
+  each(360, 0.5, (x, i) => { if (rnd(i + 5) > 0.3) sailboat(x + 40, 134); });
+  each(420, 1, (x, i) => {
+    if (rnd(i + 3) <= 0.3) return;
+    const bx = x + 120, by = 146;
+    rect(bx - 1, by - 30, 20, 32, '#402800'); rect(bx, by - 29, 18, 30, '#f88020'); rect(bx + 14, by - 29, 4, 30, '#d86010');
+    rect(bx + 3, by - 22, 12, 10, '#fcfcfc'); text('1', bx + 6, by - 20, '#d86010', 2); rect(bx - 6, by + 1, 30, 2, 'rgba(255,255,255,0.7)');
+  });
+  for (let i = 0; i < 3; i++) each(10, 1, (x, j) => rect(x, LANES[i] + 6, 3, 2, j % 2 ? '#f88020' : '#fcfcfc'));
+}
+function bgBikeK() {
+  const hz = 108;
+  bands(['#4a9cf0', '#72b8f8', '#9cd0fc', '#c4e4fc'], 0, hz);
+  each(150, 0.08, (x, i) => cloud(x, 8 + (rnd(i) * 44 | 0)));
+  each(130, 0.15, (x, i) => mount(x + 65, hz - 4, 18 + (rnd(i) * 14 | 0), '#78b0c8'));
+  each(300, 0.25, (x, i) => { if (rnd(i + 3) > 0.4) castle(x + 60, hz + 2); });
+  hillFields(hz + 14);
+  rect(0, 140, W, 6, '#6cb844');
+  each(90, 0.7, (x, i) => { if (rnd(i + 2) > 0.3) fachwerk(x, 138, i); });
+  each(70, 0.92, (x, i) => { if (rnd(i + 8) > 0.35) appleTree(x, 142, i); });
+  each(260, 0.9, (x, i) => { if (rnd(i + 5) > 0.45) cow(x, 136 + (rnd(i) * 6 | 0)); });
+  rect(0, 146, W, H - 146, '#4a4a56'); rect(0, 146, W, 2, '#8c8c9c');
+  each(26, 1, (x, i) => px(x + rnd(i) * 20, 150 + (rnd(i + 5) * 28 | 0), '#62626e'));
+  each(30, 1, x => rect(x, 172, 18, 2, '#fcfcfc'));
+  each(1000, 1, (x, i) => {
+    const bx = x + 300;
+    rect(bx + 10, 80, 5, 70, '#7a7a88'); rect(bx - 8, 40, 66, 42, '#1850b0'); rect(bx - 7, 41, 64, 40, '#2c6cd0');
+    text('LAND VAN', bx + 10, 44, '#fcfcfc'); text('DE 1000', bx - 2, 52, '#fcd800', 2); text('HEUVELS', bx + 12, 66, '#fcfcfc');
+  });
+  each(760, 1, (x, i) => { if (rnd(i + 7) > 0.35) spargel(x + 520, 150); });
+}
+function bgRunK() {
+  bands(['#4a9cf0', '#72b8f8', '#9cd0fc', '#c4e4fc'], 0, 118);
+  each(170, 0.08, (x, i) => cloud(x, 6 + (rnd(i + 4) * 30 | 0)));
+  each(130, 0.15, (x, i) => mount(x + 65, 108, 16 + (rnd(i) * 14 | 0), '#78b0c8'));
+  each(400, 0.3, (x, i) => { if (rnd(i + 2) > 0.4) castle(x + 100, 104); });
+  hillFields(118);
+  rect(0, 134, W, 12, '#c8b898');
+  each(90, 0.75, (x, i) => { if (rnd(i + 2) > 0.2) fachwerk(x, 134, i); });
+  each(110, 0.9, (x, i) => { if (rnd(i + 7) > 0.4) appleTree(x, 138, i); });
+  each(700, 1, (x, i) => { if (rnd(i + 4) > 0.3) stall(x + 200, 142); });
+  each(11, 1, (x, i) => { if (rnd(i) > 0.2) person(x, 138, i); });
+  each(130, 1, (x, i) => table(x, 136, i));
+  rect(0, 146, W, H - 146, '#9a8878'); rect(0, 146, W, 2, '#c8b8a8');
+  each(34, 1, x => rect(x, 172, 20, 2, '#f4ece4'));
+}
+const BGS = { kona: [bgSwim, bgBike, bgRun], ffm: [bgSwimF, bgBikeF, bgRunF], gb: [bgSwimG, bgBikeG, bgRunG], kr: [bgSwimK, bgBikeK, bgRunK] };
 
 // ---------- spelstaat
 let mode = 'title', P, RIV, BOTTLES, HAZ, FR, tr = null, floats = [], parts = [], confetti = [], keyFlash = 0, cd = 0, lastCd = 0, finishT = 0, best = 0;
@@ -682,7 +933,7 @@ function newRace() {
     { name: 'SCHILDPAD', col: '#00a800', hair: '#6a3a18', girl: true, base0: 0.93, shorts: '#1a5a2a' },
     { name: 'BOB', col: '#2038ec', hair: '#e8c050', base0: 1.02, shorts: '#181830' }
   ].map((r, i) => Object.assign(r, { dist: 0, speed: 0, ph: 0, ph0: i * 2.1, fin: null, napT: 0, napped: false, trd: [false, false], trT: 0 }));
-  const NB = [3, 13, 8]; BOTTLES = [];
+  const NB = HALF ? [2, 7, 4] : [3, 13, 8]; BOTTLES = [];
   for (let s = 0; s < 3; s++) for (let k = 0; k < NB[s]; k++) BOTTLES.push({ d: STARTS[s] + LEN[s] * (k + 1) / (NB[s] + 1), got: false });
   HAZ = [];                                           // obstakels liggen tussen de flesjes in
   for (let s = 0; s < 3; s++) { const n = NB[s] + 1; for (let k = 0; k < n; k++) HAZ.push({ d: STARTS[s] + LEN[s] * (k + 0.5) / n, hit: false, i: HAZ.length }); }
@@ -700,7 +951,7 @@ function goSelect() { mode = 'select'; }
 function goProfile() { mode = 'profile'; nameFresh = !!PROFILE.name; }
 function goLevel() { mode = 'level'; }
 function start() {
-  LOC = LOC_KEYS[sel]; CLICK_POWER = DIFFS[DIFF].power;
+  LOC = LOC_KEYS[sel]; CLICK_POWER = DIFFS[DIFF].power; setCourse(!!LOCS[LOC].half);
   try { localStorage.setItem('triathlonDiff', DIFF); } catch (e) { /* negeren */ }
   newRace(); mode = 'countdown'; cd = 3.999; lastCd = 4;
 }
@@ -719,7 +970,7 @@ function press() {
   if (mode === 'title') { goProfile(); return; }
   if (mode === 'transition') { trStep(); return; }
   if (mode !== 'race') return;
-  P.speed += MULT[P.stage] * CLICK_POWER * (P.energy < 25 ? 0.7 : 1);
+  P.speed += MULT[P.stage] * CLICK_POWER * (P.energy < 25 ? 0.7 : 1) * (1 - 0.35 * grade(P.dist));
   P.energy = Math.max(0, P.energy - 0.4 * CLICK_POWER);
   P.clicks.push(T); keyFlash = 0.08; sfx.step();
 }
@@ -823,7 +1074,7 @@ function update(dt) {
     }
     for (const h of HAZ) if (!h.hit && P.hitCd <= 0 && Math.abs(P.dist - h.d) < 0.35 && jumpH() < 5) {
       h.hit = true; P.hitCd = 0.8; P.hitT = 0.3; P.speed *= 0.2; P.energy = Math.max(0, P.energy - 6);
-      pop(['KWAL!', 'AU!', 'OEPS!'][stageAt(h.d)], '#f83800'); sfx.hit();
+      pop(['KWAL!', 'AU!', 'IEUW!'][stageAt(h.d)], '#f83800'); sfx.hit();
     }
     const st = P.stage, prog = (P.dist - STARTS[st]) / LEN[st];
     if (prog > 0.5 && !P.half[st]) { P.half[st] = true; pop('HALVE WEG!', '#fcd800'); }
@@ -835,7 +1086,7 @@ function update(dt) {
     const st = stageAt(r.dist);
     if (r.nap && !r.napped && r.dist > B1 + LEN[1] * 0.18) { r.napped = true; r.napT = 3; }
     const base = r.nap && r.napped ? 1.0 : r.base0;
-    let target = MULT[st] * BASE_SPEED * base * (1 + 0.12 * Math.sin(T * 0.8 + r.ph0));
+    let target = MULT[st] * BASE_SPEED * base * (1 + 0.12 * Math.sin(T * 0.8 + r.ph0)) * (1 - 0.35 * grade(r.dist));
     if (r.napT > 0) { r.napT -= dt; target = 0; }
     r.speed += (target - r.speed) * Math.min(1, dt * 3);
     const nd = Math.min(TOTAL + 12, r.dist + r.speed * dt); r.ph += r.speed * dt;
@@ -888,7 +1139,11 @@ function drawHazards() {
     if (st === 0) spr(JELLY, { p: '#f878f8', w: '#fcfcfc' }, sx - 9, y0 - 14 + Math.round(Math.sin(T * 3 + h.d) * 1.5), false, 2);
     else if (st === 1 && !odd) spr(CONE, { o: '#fc7c30', w: '#fcfcfc' }, sx - 7, y0 - 14, false, 2);
     else if (st === 1) { rect(sx - 8, y0 - 9, 16, 9, '#6a6a78'); rect(sx - 5, y0 - 12, 10, 4, '#7c7c8c'); rect(sx - 8, y0 - 9, 4, 3, '#9a9aaa'); rect(sx + 2, y0 - 4, 6, 4, '#4a4a58'); }
-    else if (!odd) spr(BANANA, { y: '#fcd800', b: '#7c4c1c' }, sx - 9, y0 - 10, false, 2);
+    else if (!odd) {                                 // drol met oogjes, stinklijntjes en vliegjes
+      spr(POOP, { b: '#8a5a2a', d: '#5a3418', l: '#b07a3c', w: '#fcfcfc', k: '#101010' }, sx - 10, y0 - 18, false, 2);
+      for (let k = 0; k < 3; k++) rect(sx - 6 + k * 6, y0 - 25 - (((T * 8 + k * 3) % 6) | 0), 1, 3, '#78c040');
+      rect(sx + Math.round(Math.cos(T * 5) * 12), y0 - 22 + Math.round(Math.sin(T * 7) * 4), 2, 1, '#101010');
+    }
     else { rect(sx - 9, y0 - 14, 2, 14, '#fcfcfc'); rect(sx + 7, y0 - 14, 2, 14, '#fcfcfc'); rect(sx - 9, y0 - 14, 18, 2, '#d82800'); rect(sx - 9, y0 - 8, 18, 2, '#fcfcfc'); }
     const ah = h.d - P.dist;
     if (!h.hit && ah > 0.8 && ah < 5.5 && (T * 5 | 0) % 2 === 0) stext('SPRING!', Math.round(sx - tw('SPRING!') / 2), y0 - 32, '#fc4030');
@@ -929,10 +1184,11 @@ function drawHud() {
   stext(P.clicks.length + ' KLIKS/S', hx, H - 9, '#fcd800');
   if (!TOUCH) drawKey();
   if (mode === 'race' && P.energy < 25 && (T * 4 | 0) % 2) ctext('SPRING NAAR EEN FLESJE!', 34, '#f83800');
+  if (mode === 'race') { const gr = grade(P.dist); if (gr > 0.4) ctext('BERGOP! KLIK HARDER!', H - 12, '#f83800'); else if (gr < -0.4) ctext('BERGAF! LEKKER SNEL!', H - 12, '#00d800'); }
 }
 function drawHint() {
   const blink = (T * 2 | 0) % 2 === 0;
-  if (blink) ctext('KLIK STEEDS OP >', 36, '#fcd800', 2);
+  if (blink) ctext(TOUCH ? 'TIK STEEDS OP KLIK' : 'KLIK STEEDS OP >', 36, '#fcd800', 2);
   ctext('HOE SNELLER JE KLIKT, HOE SNELLER JE GAAT!', 58, '#fcfcfc');
   ctext('SPRING NAAR DE FLESJES VOOR ENERGIE!', 67, '#3cbcfc');
   ctext('SPRING OVER DE OBSTAKELS!', 76, '#fc9830');
@@ -998,7 +1254,7 @@ function drawFinish() {
   stext('SPELTIJD ' + fmt(P.time) + ' - ' + DIFFS[DIFF].name, 72, 114, '#d8d8d8');
   if (P.pr && (T * 3 | 0) % 2) ctext('NEW PR!', 126, '#fcd800', 2);
   else if (!P.pr) ctext('BESTE ' + fmtH(best), 128, '#fcfcfc');
-  if ((T * 2 | 0) % 2 === 0) ctext('ENTER = NOG EEN KEER', 150, '#fcfcfc');
+  if ((T * 2 | 0) % 2 === 0) ctext(TOUCH ? 'TIK = NOG EEN KEER' : 'ENTER = NOG EEN KEER', 150, '#fcfcfc');
 }
 function drawPodium() {
   [[116, 148, '#c0c0d0', '2', '#2038ec', '#e8c050'], [146, 140, '#f8d800', '1', '#d82800', '#503000'], [176, 155, '#c87830', '3', '#00a800', '#a05820']].forEach(b => {
@@ -1012,11 +1268,11 @@ function drawTitle() {
   ctext('TRIATHLON', 8, '#fff', 5, GRAD);
   ctext('GAMES!', 38, '#fff', 5, GRAD);
   ctext('ZWEMMEN, FIETSEN EN HARDLOPEN!', 70, '#fcfcfc');
-  ctext('KLIK ZO SNEL MOGELIJK OP >', 80, '#fcfcfc');
-  if ((T * 2 | 0) % 2 === 0) ctext('DRUK OP ENTER OF SPATIE', 92, '#fcd800');
+  ctext(TOUCH ? 'TIK ZO SNEL MOGELIJK OP KLIK' : 'KLIK ZO SNEL MOGELIJK OP >', 80, '#fcfcfc');
+  if ((T * 2 | 0) % 2 === 0) ctext(TOUCH ? 'TIK OM TE STARTEN' : 'DRUK OP ENTER OF SPATIE', 92, '#fcd800');
   drawPodium();
   rect(0, 171, W, 9, 'rgba(0,0,0,0.7)');
-  const ctl = '> = KLIKKEN   M = MUZIEK';
+  const ctl = TOUCH ? 'TIK = KLIKKEN   LINKS TIKKEN = SPRINGEN' : '> = KLIKKEN   M = MUZIEK';
   stext(ctl, Math.round((W - tw(ctl)) / 2), 173, '#d8d8d8');
 }
 function profileDone() { PROFILE.name = PROFILE.name.trim() || 'SPELER'; saveProfile(); nameFresh = false; goSelect(); }
@@ -1055,8 +1311,8 @@ function drawProfile() {
     stext(lab, Math.round(cx - tw(lab) / 2), by + 11, on ? '#fcd800' : '#c0c0d8');
   });
   stext('<', 146, 100, '#fcd800', 3); stext('>', 162, 100, '#fcd800', 3);
-  ctext('TYP JE NAAM EN KIES MET < > JONGEN OF MEISJE', 156, '#fcfcfc');
-  if ((T * 2 | 0) % 2 === 0) ctext('ENTER = DOOR', 167, '#fcd800');
+  ctext(TOUCH ? 'TIK OP HET NAAMVAK EN KIES JONGEN OF MEISJE' : 'TYP JE NAAM EN KIES MET < > JONGEN OF MEISJE', 156, '#fcfcfc');
+  if ((T * 2 | 0) % 2 === 0) ctext(TOUCH ? 'TIK ONDERAAN = DOOR' : 'ENTER = DOOR', 167, '#fcd800');
 }
 const snaps = {};
 function ensureSnaps() {
@@ -1078,19 +1334,21 @@ function drawSelect() {
   ctext('KIES JE WEDSTRIJD', 5, '#fff', 2, GRAD);
   g.imageSmoothingEnabled = false;
   LOC_KEYS.forEach((loc, i) => {
-    const x = 6 + i * 160, y = 24, w = 148, h = 130, on = sel === i, L = LOCS[loc];
+    const x = 6 + i * 78, y = 24, w = 72, h = 130, on = sel === i, L = LOCS[loc], cx = x + w / 2, st = (T / 1.8 | 0) % 3;
     rect(x - 2, y - 2, w + 4, h + 4, on ? ((T * 4 | 0) % 2 ? '#fcd800' : '#fc9830') : '#404070');
     rect(x, y, w, h, '#101030');
-    stext(L.name, Math.round(x + w / 2 - tw(L.name, 3) / 2), y + 4, '#fff', 3, GRAD);
-    stext(L.sub, Math.round(x + w / 2 - tw(L.sub) / 2), y + 22, '#d8d8e8');
-    g.drawImage(snaps[loc][(T / 1.8 | 0) % 3], 0, 0, W, H, x + 2, y + 31, 144, 81);
-    stext(STAGE_NAME[(T / 1.8 | 0) % 3], x + 5, y + 34, '#fcd800');
-    const dl = '3,8 KM - 180 KM - 42,2 KM'; stext(dl, Math.round(x + w / 2 - tw(dl) / 2), y + 115, '#fcfcfc');
-    stext(L.cap, Math.round(x + w / 2 - tw(L.cap) / 2), y + 123, '#3cbcfc');
+    stext(L.name, Math.round(cx - tw(L.name) / 2), y + 4, '#fff', 1, GRAD);
+    stext(L.sub, Math.round(cx - tw(L.sub) / 2), y + 13, '#d8d8e8');
+    g.drawImage(snaps[loc][st], 0, 0, W, H, x + 2, y + 24, 68, 38);
+    stext(STAGE_NAME[st], x + 4, y + 27, '#fcd800');
+    L.facts.forEach((l, j) => stext(l, Math.round(cx - tw(l) / 2), y + 90 + j * 9, '#fcfcfc'));
+    const kind = L.half ? 'HALVE TRIATHLON' : 'HELE TRIATHLON', dd = L.half ? '1,9-90-21,1 KM' : '3,8-180-42,2 KM';
+    stext(kind, Math.round(cx - tw(kind) / 2), y + 117, L.half ? '#fc9830' : '#fcd800'); stext(dd, Math.round(cx - tw(dd) / 2), y + 124, '#fcfcfc');
+    L.cap.forEach((l, j) => stext(l, Math.round(cx - tw(l) / 2), y + 68 + j * 8, '#3cbcfc'));
   });
-  const ctl = '< > = KIEZEN   ENTER = DOOR';
+  const ctl = TOUCH ? 'TIK OP EEN WEDSTRIJD' : '< > = KIEZEN   ENTER = DOOR';
   stext(ctl, Math.round((W - tw(ctl)) / 2), 164, '#fcfcfc');
-  const tl = '1 UUR ZWEMMEN + 5 UUR FIETSEN + 3 UUR LOPEN, MAAR DAN IN 3 MINUTEN!'; stext(tl, Math.round((W - tw(tl)) / 2), 172, '#d8d8e8');
+  const tl = LOCS[LOC_KEYS[sel]].half ? '0,5 UUR ZWEMMEN + 2,5 UUR FIETSEN + 1,5 UUR LOPEN, MAAR DAN IN 1,5 MINUUT!' : '1 UUR ZWEMMEN + 5 UUR FIETSEN + 3 UUR LOPEN, MAAR DAN IN 3 MINUTEN!'; stext(tl, Math.round((W - tw(tl)) / 2), 172, '#d8d8e8');
 }
 function drawLevel() {
   bands(['#202058', '#2c2c78', '#383898', '#4848b8'], 0, H);
@@ -1107,7 +1365,7 @@ function drawLevel() {
     rect(x + 6, y + 80, 60, 6, '#303050'); rect(x + 6, y + 80, Math.round(60 * (i + 1) / DIFFS.length), 6, d.col);
     stext(d.tip, Math.round(cx - tw(d.tip) / 2), y + 96, on ? '#fff' : '#a0a0c0');
   });
-  ctext('< > = KIEZEN   ENTER = START', 160, '#fcfcfc');
+  ctext(TOUCH ? 'TIK OP EEN NIVEAU OM TE STARTEN' : '< > = KIEZEN   ENTER = START', 160, '#fcfcfc');
   ctext(LOCS[LOC_KEYS[sel]].name + ' - ' + (PROFILE.name || 'SPELER'), 170, '#d8d8e8');
 }
 function drawTouchUI() {                           // knoppen voor telefoon en tablet
@@ -1145,7 +1403,7 @@ function render() {
 }
 
 // ---------- invoer
-function kick() { ac(); if (!musicStarted) { musicStarted = true; musicTick(); } }
+function kick() { ac(); keepAwake(); if (!musicStarted) { musicStarted = true; musicTick(); } }
 addEventListener('keydown', e => {
   const k = e.key;
   if (['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown', ' ', 'Enter', 'Backspace'].includes(k)) e.preventDefault();
@@ -1153,27 +1411,49 @@ addEventListener('keydown', e => {
   if (e.repeat) return;                              // ingedrukt houden telt niet: je moet echt klikken
   kick();
   TOUCH = false;
-  if (k === 'ArrowRight' || k === 'd' || k === 'D') { if (mode === 'select') sel = 1; else if (mode === 'level') DIFF = Math.min(DIFFS.length - 1, DIFF + 1); else { codeKey('R'); press(); } }
-  else if (k === 'ArrowLeft' || k === 'a' || k === 'A') { if (mode === 'select') sel = 0; else if (mode === 'level') DIFF = Math.max(0, DIFF - 1); else codeKey('L'); }
+  if (k === 'ArrowRight' || k === 'd' || k === 'D') { if (mode === 'select') sel = Math.min(LOC_KEYS.length - 1, sel + 1); else if (mode === 'level') DIFF = Math.min(DIFFS.length - 1, DIFF + 1); else { codeKey('R'); press(); } }
+  else if (k === 'ArrowLeft' || k === 'a' || k === 'A') { if (mode === 'select') sel = Math.max(0, sel - 1); else if (mode === 'level') DIFF = Math.max(0, DIFF - 1); else codeKey('L'); }
   else if (k === 'ArrowUp' || k === 'w' || k === 'W') jump();
-  else if (mode === 'select' && (k === '1' || k === '2')) sel = +k - 1;
+  else if (mode === 'select' && k >= '1' && k <= String(LOC_KEYS.length)) sel = +k - 1;
   else if (mode === 'level' && k >= '1' && k <= String(DIFFS.length)) DIFF = +k - 1;
   else if (k === ' ' || k === 'Enter') confirm();
+  else if (k === 'f' || k === 'F') toggleFull();
   else if (k === 'm' || k === 'M') musicOn = !musicOn;
 });
-let fsDone = false;
-function goFull() {                                // op telefoon beeldvullend spelen
-  if (fsDone) return; fsDone = true;
-  try { const el = document.documentElement; if (el.requestFullscreen) el.requestFullscreen().catch(() => {}); } catch (e) { /* negeren */ }
+const FS_OUT = ['xxx..xxx', 'x......x', 'x......x', '........', '........', 'x......x', 'x......x', 'xxx..xxx'];
+const FS_IN = ['..x..x..', '..x..x..', 'xxx..xxx', '........', '........', 'xxx..xxx', '..x..x..', '..x..x..'];
+const isFull = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+const FSB = () => (mode === 'race' || mode === 'countdown' || mode === 'transition' || mode === 'finish') ? { x: 140, y: 1, w: 24, h: 18 } : { x: W - 28, y: 3, w: 24, h: 18 };
+function showFsTip() { const t = document.getElementById('fstip'); if (t) t.style.display = 'flex'; }
+function toggleFull() {                            // fullscreen-knop; op een iPhone kan dat niet, dan tonen we een tip
+  const d = document, el = d.documentElement, req = el.requestFullscreen || el.webkitRequestFullscreen, exit = d.exitFullscreen || d.webkitExitFullscreen;
+  if (!req) { showFsTip(); return; }
+  try {
+    if (isFull()) { exit.call(d); return; }
+    const p = req.call(el), lock = () => { try { screen.orientation.lock('landscape').catch(() => {}); } catch (e) { /* niet beschikbaar */ } };
+    if (p && p.then) p.then(lock, showFsTip); else lock();
+  } catch (e) { showFsTip(); }
+}
+let wakeLock = null;
+async function keepAwake() {                      // scherm blijft aan tijdens het spelen
+  try { if (navigator.wakeLock && !wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); } } catch (e) { /* niet beschikbaar */ }
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') keepAwake(); });
+function drawFsButton() {
+  const b = FSB(), edge = 'rgba(255,255,255,0.7)';
+  rect(b.x, b.y, b.w, b.h, 'rgba(0,0,0,0.55)'); rect(b.x, b.y, b.w, 1, edge); rect(b.x, b.y + b.h - 1, b.w, 1, edge); rect(b.x, b.y, 1, b.h, edge); rect(b.x + b.w - 1, b.y, 1, b.h, edge);
+  spr(isFull() ? FS_IN : FS_OUT, { x: '#fcfcfc' }, b.x + (b.w - 8) / 2, b.y + (b.h - 8) / 2);
 }
 const pts = new Map();
-cv.addEventListener('pointerdown', e => {
+addEventListener('pointerdown', e => {
+  if (e.target.id === 'fstip') return;
   e.preventDefault(); kick();
-  if (e.pointerType === 'touch') { TOUCH = true; goFull(); }
-  const r = cv.getBoundingClientRect(), fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
+  if (e.pointerType === 'touch') TOUCH = true;
+  const r = cv.getBoundingClientRect(), fx = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)), fy = Math.max(0, Math.min(1, (e.clientY - r.top) / r.height));
+  { const b = FSB(), cx = fx * W, cy = fy * H; if (cx >= b.x - 4 && cx <= b.x + b.w + 4 && cy >= b.y - 4 && cy <= b.y + b.h + 4) { toggleFull(); return; } }
   pts.set(e.pointerId, { x: e.clientX, y: e.clientY, t: performance.now() });
   if (mode === 'profile') { profileTap(fx * W, fy * H); return; }
-  if (mode === 'select') { sel = fx >= 0.5 ? 1 : 0; goLevel(); }
+  if (mode === 'select') { sel = Math.max(0, Math.min(LOC_KEYS.length - 1, Math.floor((fx * W - 6) / 78))); goLevel(); }
   else if (mode === 'level') { DIFF = Math.max(0, Math.min(DIFFS.length - 1, Math.floor((fx * W - 6) / 78))); start(); }
   else if (mode === 'race') { if (TOUCH && fx < 0.3) jump(); else press(); }
   else confirm();
@@ -1185,12 +1465,12 @@ function swipeEnd(e) {                              // swipe omhoog = springen, 
   if (performance.now() - s.t > 600 || Math.max(Math.abs(dx), Math.abs(dy)) < 40) return;
   if (Math.abs(dy) > Math.abs(dx)) { if (dy < 0) jump(); } else codeKey(dx > 0 ? 'R' : 'L');
 }
-cv.addEventListener('pointerup', swipeEnd); cv.addEventListener('pointercancel', swipeEnd);
+addEventListener('pointerup', swipeEnd); addEventListener('pointercancel', swipeEnd);
 
 let last = 0;
 function frame(ts) {
   const dt = Math.min(0.05, (ts - last) / 1000 || 0); last = ts;
-  update(dt); render(); requestAnimationFrame(frame);
+  update(dt); render(); drawFsButton(); requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 </script>
