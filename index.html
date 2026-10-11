@@ -16,6 +16,18 @@
   @media (orientation:portrait) and (pointer:coarse){#rot{display:flex}}
   #fstip{display:none;position:fixed;inset:0;z-index:10;background:rgba(0,0,0,.92);color:#fcd800;font:bold min(4vw,7vh) monospace;align-items:center;justify-content:center;text-align:center;padding:5vw;line-height:1.5}
 </style>
+<script>
+/* Bezoekersstatistiek met GoatCounter: geen cookies, geen namen. Vul hieronder je eigen code in. */
+(function () {
+  var CODE = 'gitgoatcounter';                                   // bijvoorbeeld 'tim-triathlon' voor https://tim-triathlon.goatcounter.com
+  var lokaal = /^(localhost|127\.|\[::1\])/.test(location.hostname) || location.protocol === 'file:';
+  if (!/^[a-z0-9-]+$/.test(CODE) || lokaal) return;
+  var s = document.createElement('script');
+  s.async = true; s.src = 'https://gc.zgo.at/count.js';
+  s.setAttribute('data-goatcounter', 'https://' + CODE + '.goatcounter.com/count');
+  document.head.appendChild(s);
+})();
+</script>
 </head>
 <body>
 <canvas id="c"></canvas>
