@@ -33,7 +33,7 @@
 </head>
 <body>
 <canvas id="c"></canvas>
-<div id="ver">Engine: Franca's Toeter-Turbo Version: 0x31337.V1.0.0.7</div>
+<div id="ver">Engine: Franca's Toeter-Turbo Version: 0x31337.V1.0.0.8</div>
 <div id="rot"dus me>DRAAI JE TELEFOON<br>(LIGGEND SPELEN)</div>
 <div id="fstip" onclick="this.style.display='none'">BEELDVULLEND SPELEN OP IPHONE:<br>TIK OP DELEN EN KIES 'ZET OP BEGINSCHERM'.<br>START HET SPEL DAARVANDAAN.<br>(TIK OM TE SLUITEN)</div>
 <script>
@@ -49,8 +49,9 @@ const BASE_SPEED = 4.0;                           // tempo van de tegenstanders 
 let CLICK_POWER = 2;                            // hoger = minder klikken nodig
 const PAR_S = MULT.map(m => m * BASE_SPEED);      // normale snelheid in eenheden per seconde
 let PAR_T, LEN, B1, B2, TOTAL, STARTS, REAL_KM, REAL_H, TIME_SCALE, HALF = false;                       // normale speltijd in seconden: 1 : 5 : 3
+const LENF = 2;                                   // lengte van de race: 1 = kort (3 min), 2 = lang (6 min)
 function setCourse(half) {                         // hele of halve triathlon: zelfde verhoudingen 1 : 5 : 3
-  HALF = half; PAR_T = half ? [10, 50, 30] : [20, 100, 60];
+  HALF = half; PAR_T = (half ? [10, 50, 30] : [20, 100, 60]).map(t => t * LENF);
   LEN = PAR_S.map((s, i) => Math.round(s * PAR_T[i]));
   B1 = LEN[0]; B2 = LEN[0] + LEN[1]; TOTAL = B2 + LEN[2]; STARTS = [0, B1, B2];
   REAL_KM = half ? [1.9, 90, 21.1] : [3.8, 180, 42.2]; REAL_H = half ? [0.5, 2.5, 1.5] : [1, 5, 3];
@@ -752,7 +753,7 @@ const TERRAIN = {
   }
 };
 const terrain = d => TERRAIN[LOC] ? TERRAIN[LOC](d) : 0;
-const grade = d => Math.max(-1.3, Math.min(1.3, (terrain(d + 0.5) - terrain(d - 0.5)) / PXU / 0.06));
+const grade = d => Math.max(-1.3, Math.min(1.3, (terrain(d + 0.5) - terrain(d - 0.5)) / PXU / 0.06 * LENF));
 const wx = d => PX0 + d * PXU - CAM;                // schermpositie van een plek in de wereld
 function ridge(base, col, hl) {                    // heuvelrug die het parcours volgt
   for (let x = 0; x < W; x += 2) {
@@ -973,7 +974,7 @@ const BGS = { kona: [bgSwim, bgBike, bgRun], ffm: [bgSwimF, bgBikeF, bgRunF], gb
 
 // ---------- spelstaat
 let mode = 'title', P, RIV, BOTTLES, HAZ, FR, tr = null, floats = [], parts = [], confetti = [], keyFlash = 0, cd = 0, lastCd = 0, finishT = 0, best = 0;
-const bestKey = () => 'triathlonBest_' + LOC + '_' + DIFF;
+const bestKey = () => 'triathlonBest_' + LOC + '_' + DIFF + '_L' + LENF;
 const fmt = t => { const m = Math.floor(t / 60), s = t - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1); };
 const fmtH = s => { s = Math.round(s); return Math.floor(s / 3600) + ':' + String(Math.floor(s % 3600 / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };
 const clock = () => P.time * TIME_SCALE + P.trReal;
@@ -994,7 +995,7 @@ function newRace() {
     { name: 'SCHILDPAD', col: '#00a800', hair: '#6a3a18', girl: true, base0: 0.93, shorts: '#1a5a2a', cap: '#f8d800' },
     { name: 'BOB', col: '#2038ec', hair: '#e8c050', base0: 1.02, shorts: '#181830', cap: '#fcfcfc' }
   ].map((r, i) => Object.assign(r, { dist: 0, speed: 0, ph: 0, ph0: i * 2.1, fin: null, napT: 0, napped: false, trd: [false, false], trT: 0 }));
-  const NB = HALF ? [2, 7, 4] : [3, 13, 8]; BOTTLES = [];
+  const NB = (HALF ? [2, 7, 4] : [3, 13, 8]).map(n => n * LENF); BOTTLES = [];
   for (let s = 0; s < 3; s++) for (let k = 0; k < NB[s]; k++) BOTTLES.push({ d: STARTS[s] + LEN[s] * (k + 1) / (NB[s] + 1), got: false });
   HAZ = [];                                           // obstakels liggen tussen de flesjes in
   for (let s = 0; s < 3; s++) { const n = NB[s] + 1; for (let k = 0; k < n; k++) HAZ.push({ d: STARTS[s] + LEN[s] * (k + 0.5) / n, hit: false, i: HAZ.length }); }
@@ -1460,7 +1461,7 @@ function drawSelect() {
   });
   const ctl = TOUCH ? 'TIK OP EEN WEDSTRIJD' : '< > = KIEZEN   ENTER = DOOR';
   stext(ctl, Math.round((W - tw(ctl)) / 2), 159, '#fcfcfc');
-  const half = LOCS[LOC_KEYS[sel]].half, t1 = half ? '0,5 UUR ZWEMMEN + 2,5 UUR FIETSEN + 1,5 UUR LOPEN' : '1 UUR ZWEMMEN + 5 UUR FIETSEN + 3 UUR LOPEN', t2 = half ? 'MAAR DAN IN 1,5 MINUUT!' : 'MAAR DAN IN 3 MINUTEN!';
+  const half = LOCS[LOC_KEYS[sel]].half, t1 = half ? '0,5 UUR ZWEMMEN + 2,5 UUR FIETSEN + 1,5 UUR LOPEN' : '1 UUR ZWEMMEN + 5 UUR FIETSEN + 3 UUR LOPEN', t2 = 'MAAR DAN IN ' + String((half ? 1.5 : 3) * LENF).replace('.', ',') + ' MINUTEN!';
   stext(t1, Math.round((W - tw(t1)) / 2), 167, '#d8d8e8'); stext(t2, Math.round((W - tw(t2)) / 2), 174, '#fcd800');
 }
 function drawLevel() {
