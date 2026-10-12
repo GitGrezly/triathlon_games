@@ -33,7 +33,7 @@
 </head>
 <body>
 <canvas id="c"></canvas>
-<div id="ver">Engine: Franca's Toeter-Turbo Version: 0x31337.V1.0.0.6</div>
+<div id="ver">Engine: Franca's Toeter-Turbo Version: 0x31337.V1.0.0.7</div>
 <div id="rot"dus me>DRAAI JE TELEFOON<br>(LIGGEND SPELEN)</div>
 <div id="fstip" onclick="this.style.display='none'">BEELDVULLEND SPELEN OP IPHONE:<br>TIK OP DELEN EN KIES 'ZET OP BEGINSCHERM'.<br>START HET SPEL DAARVANDAAN.<br>(TIK OM TE SLUITEN)</div>
 <script>
@@ -123,9 +123,22 @@ function ik(hx, hy, fx, fy, l1, l2, s) {           // twee-botten-ledemaat (knie
 const rnd = n => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
 const ease = u => { u = Math.max(0, Math.min(1, u)); return u * u * (3 - 2 * u); };
 let CAM = 0, T = 0;
+const FAR = { on: false, busy: false, keep: null, a: null, b: null };
+function farBegin() {
+  if (!FAR.a) for (const k of ['a', 'b']) { FAR[k] = document.createElement('canvas'); FAR[k].width = W; FAR[k].height = H; }
+  FAR.keep = g; FAR.busy = true; g = FAR.a.getContext('2d'); g.clearRect(0, 0, W, H);
+}
+function farEnd(f) {                               // verre lagen worden vager: verkleinen en weer vergroten
+  const k = f < 0.4 ? 0.6 : 0.8, w = Math.round(W * k), h = Math.round(H * k), b = FAR.b.getContext('2d');
+  g = FAR.keep; FAR.busy = false;
+  b.clearRect(0, 0, W, H); b.imageSmoothingEnabled = true; b.drawImage(FAR.a, 0, 0, w, h);
+  g.imageSmoothingEnabled = true; g.drawImage(FAR.b, 0, 0, w, h, 0, 0, W, H); g.imageSmoothingEnabled = false;
+}
 function each(step, f, fn) {                      // herhalend, parallax-verschoven element
-  const off = CAM * f, i0 = Math.floor(off / step) - 1, n = Math.ceil(W / step) + 3;
+  const off = CAM * f, i0 = Math.floor(off / step) - 1, n = Math.ceil(W / step) + 3, far = FAR.on && !FAR.busy && f < 0.75;
+  if (far) farBegin();
   for (let i = i0; i < i0 + n; i++) fn(i * step - off, i);
+  if (far) farEnd(f);
 }
 
 // ---------- 3x5 pixelfont
@@ -140,19 +153,24 @@ const FONT = {};
  '?:110001010000010|\':010010000000000|%:101001010100101|,:000000000010100|=:000111000111000|>:100010001010100|' +
  '<:001010100010001|&:010101010101011')
   .split('|').forEach(p => { FONT[p[0]] = p.slice(2); });
+FONT.M = '1000111011101011000110001'; FONT.W = '1000110001101011101110001';   // M, W, N en K zijn breder, zodat je ze niet met elkaar verwart
+FONT.N = '10011101101110011001'; FONT.K = '10011010110010101001';
 function text(s, x, y, c, sc = 1, rows) {
-  s = String(s).toUpperCase();
-  for (const ch of s) {
+  for (const ch of String(s).toUpperCase()) {
     const gl = FONT[ch];
-    if (gl) for (let k = 0; k < 15; k++) if (gl[k] === '1') {
-      const r = (k / 3) | 0;
-      rect(x + (k % 3) * sc, y + r * sc, sc, sc, rows ? rows[r] : c);
-    }
-    x += 4 * sc;
+    if (!gl) { x += 4 * sc; continue; }
+    const w = gl.length / 5;
+    for (let k = 0; k < gl.length; k++) if (gl[k] === '1') rect(x + (k % w) * sc, y + ((k / w) | 0) * sc, sc, sc, rows ? rows[(k / w) | 0] : c);
+    x += (w + 1) * sc;
   }
 }
-const tw = (s, sc = 1) => String(s).length * 4 * sc - sc;
-const stext = (s, x, y, c, sc = 1, rows) => { text(s, x + sc, y + sc, '#000', sc); text(s, x, y, c, sc, rows); };
+const tw = (s, sc = 1) => { let n = -1; for (const ch of String(s).toUpperCase()) n += (FONT[ch] ? FONT[ch].length / 5 : 3) + 1; return n * sc; };
+const stext = (s, x, y, c, sc = 1, rows) => {    // zwarte rand rondom, leesbaar op elke achtergrond
+  const t = sc > 3 ? 2 : 1;
+  for (const [dx, dy] of [[-t, 0], [t, 0], [0, -t], [0, t], [-t, -t], [t, -t], [-t, t], [t, t]]) text(s, x + dx, y + dy, '#000', sc);
+  if (sc > t) text(s, x + sc, y + sc, '#000', sc);
+  text(s, x, y, c, sc, rows);
+};
 const ctext = (s, y, c, sc = 1, rows) => stext(s, Math.round((W - tw(s, sc)) / 2), y, c, sc, rows);
 
 // ---------- audio (WebAudio, geen bestanden nodig)
@@ -1152,15 +1170,8 @@ function update(dt) {
 
 // ---------- tekenen
 const OUT = { oc: null, sc: null, tc: null, hc: null, W: 130, H: 120, OX: 65, OY: 95 };
-const SOFT = { a: null, b: null };
 var puffs = [];
-function softly(fn) {                              // achtergrond iets vager en donkerder, zodat de sporters er beter uitspringen
-  if (!SOFT.a) { SOFT.a = document.createElement('canvas'); SOFT.a.width = W; SOFT.a.height = H; SOFT.b = document.createElement('canvas'); SOFT.b.width = 224; SOFT.b.height = 126; }
-  const keep = g, ga = SOFT.a.getContext('2d'); ga.clearRect(0, 0, W, H); g = ga; fn(); g = keep;
-  const gb = SOFT.b.getContext('2d'); gb.imageSmoothingEnabled = true; gb.drawImage(SOFT.a, 0, 0, 224, 126);
-  g.imageSmoothingEnabled = true; g.drawImage(SOFT.b, 0, 0, W, H); g.imageSmoothingEnabled = false;
-  rect(0, 0, W, H, 'rgba(24,12,48,0.16)');
-}
+function softly(fn) { FAR.on = true; try { fn(); } finally { FAR.on = false; } }   // alleen verre lagen (wolken, bergen, skyline) worden vager; borden en publiek blijven scherp
 function drawPuffs() {                             // stofwolkjes achter de speler, blijven op hun plek in de wereld liggen
   for (const p of puffs) { const k = p.life / p.max; g.globalAlpha = 0.5 * k; circ(Math.round(PX0 + (p.d - P.dist) * PXU), Math.round(p.y), Math.max(1, Math.round(p.r * (2 - k))), '#d8c8b0'); }
   g.globalAlpha = 1;
@@ -1263,6 +1274,7 @@ function drawKey() {
 }
 function drawHud() {
   const st = stageAt(P.dist), km = Math.max(0, (P.dist - STARTS[st]) / LEN[st] * REAL_KM[st]);
+  rect(0, 0, W, 32, 'rgba(6,6,30,0.5)'); rect(0, 32, W, 1, 'rgba(6,6,30,0.25)');
   rect(14, 4, 118, 11, '#000'); rect(15, 5, 116, 9, '#202028');          // druppel + balk met blokjes, zoals in het filmpje
   const n = Math.ceil(P.energy / 100 * 28);
   const col = P.energy > 50 ? '#f8d800' : P.energy > 25 ? '#fc9830' : ((T * 6 | 0) % 2 ? '#f83800' : '#7c0800');
@@ -1432,21 +1444,24 @@ function drawSelect() {
   ctext('KIES JE WEDSTRIJD', 5, '#fff', 2, GRAD);
   g.imageSmoothingEnabled = false;
   LOC_KEYS.forEach((loc, i) => {
-    const x = 6 + i * 78, y = 24, w = 72, h = 130, on = sel === i, L = LOCS[loc], cx = x + w / 2, st = (T / 1.8 | 0) % 3;
+    const x = 6 + i * 78, y = 22, w = 72, h = 133, on = sel === i, L = LOCS[loc], cx = x + w / 2, st = (T / 1.8 | 0) % 3;
     rect(x - 2, y - 2, w + 4, h + 4, on ? ((T * 4 | 0) % 2 ? '#fcd800' : '#fc9830') : '#404070');
     rect(x, y, w, h, '#101030');
     stext(L.name, Math.round(cx - tw(L.name) / 2), y + 4, '#fff', 1, GRAD);
     stext(L.sub, Math.round(cx - tw(L.sub) / 2), y + 13, '#d8d8e8');
-    g.drawImage(snaps[loc][st], 0, 0, W, H, x + 2, y + 24, 68, 38);
-    stext(STAGE_NAME[st], x + 4, y + 27, '#fcd800');
-    L.facts.forEach((l, j) => stext(l, Math.round(cx - tw(l) / 2), y + 90 + j * 9, '#fcfcfc'));
-    const kind = L.half ? 'HALVE TRIATHLON' : 'HELE TRIATHLON', dd = L.half ? '1,9-90-21,1 KM' : '3,8-180-42,2 KM';
-    stext(kind, Math.round(cx - tw(kind) / 2), y + 117, L.half ? '#fc9830' : '#fcd800'); stext(dd, Math.round(cx - tw(dd) / 2), y + 124, '#fcfcfc');
+    rect(x + 1, y + 23, 70, 40, '#505088'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+    g.drawImage(snaps[loc][st], 0, 0, W, H, x + 2, y + 24, 68, 38); g.imageSmoothingEnabled = false;
+    rect(x + 2, y + 24, tw(STAGE_NAME[st]) + 5, 9, 'rgba(0,0,0,0.75)'); stext(STAGE_NAME[st], x + 4, y + 27, '#fcd800');
     L.cap.forEach((l, j) => stext(l, Math.round(cx - tw(l) / 2), y + 68 + j * 8, '#3cbcfc'));
+    rect(x + 6, y + 84, w - 12, 1, '#505088'); rect(x + 6, y + 115, w - 12, 1, '#505088');
+    L.facts.forEach((l, j) => stext(l, Math.round(cx - tw(l) / 2), y + 89 + j * 9, '#fcfcfc'));
+    const kind = L.half ? 'HALVE TRIATHLON' : 'HELE TRIATHLON', dd = L.half ? '1,9-90-21,1 KM' : '3,8-180-42,2 KM';
+    stext(kind, Math.round(cx - tw(kind) / 2), y + 118, L.half ? '#fc9830' : '#fcd800'); stext(dd, Math.round(cx - tw(dd) / 2), y + 125, '#fcfcfc');
   });
   const ctl = TOUCH ? 'TIK OP EEN WEDSTRIJD' : '< > = KIEZEN   ENTER = DOOR';
-  stext(ctl, Math.round((W - tw(ctl)) / 2), 164, '#fcfcfc');
-  const tl = LOCS[LOC_KEYS[sel]].half ? '0,5 UUR ZWEMMEN + 2,5 UUR FIETSEN + 1,5 UUR LOPEN, MAAR DAN IN 1,5 MINUUT!' : '1 UUR ZWEMMEN + 5 UUR FIETSEN + 3 UUR LOPEN, MAAR DAN IN 3 MINUTEN!'; stext(tl, Math.round((W - tw(tl)) / 2), 172, '#d8d8e8');
+  stext(ctl, Math.round((W - tw(ctl)) / 2), 159, '#fcfcfc');
+  const half = LOCS[LOC_KEYS[sel]].half, t1 = half ? '0,5 UUR ZWEMMEN + 2,5 UUR FIETSEN + 1,5 UUR LOPEN' : '1 UUR ZWEMMEN + 5 UUR FIETSEN + 3 UUR LOPEN', t2 = half ? 'MAAR DAN IN 1,5 MINUUT!' : 'MAAR DAN IN 3 MINUTEN!';
+  stext(t1, Math.round((W - tw(t1)) / 2), 167, '#d8d8e8'); stext(t2, Math.round((W - tw(t2)) / 2), 174, '#fcd800');
 }
 function drawLevel() {
   bands(['#202058', '#2c2c78', '#383898', '#4848b8'], 0, H);
