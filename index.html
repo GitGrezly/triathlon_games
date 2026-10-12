@@ -33,8 +33,8 @@
 </head>
 <body>
 <canvas id="c"></canvas>
-<div id="ver">Engine: Franca's Toeter-Turbo Version: 0x31337.V1.0.0.1</div>
-<div id="rot">DRAAI JE TELEFOON<br>(LIGGEND SPELEN)</div>
+<div id="ver">Engine: Franca's Toeter-Turbo Version: 0x31337.V1.0.0.6</div>
+<div id="rot"dus me>DRAAI JE TELEFOON<br>(LIGGEND SPELEN)</div>
 <div id="fstip" onclick="this.style.display='none'">BEELDVULLEND SPELEN OP IPHONE:<br>TIK OP DELEN EN KIES 'ZET OP BEGINSCHERM'.<br>START HET SPEL DAARVANDAAN.<br>(TIK OM TE SLUITEN)</div>
 <script>
 'use strict';
@@ -184,7 +184,8 @@ const sfx = {
   },
   jump() { tone(300, 0.2, 'square', 0.05, 0, 500); },
   hit() { tone(160, 0.35, 'sawtooth', 0.07, 0, -110); },
-  wheelie() { tone(200, 0.4, 'sawtooth', 0.05, 0, 500); tone(900, 0.12, 'square', 0.05, 0.4); tone(1200, 0.2, 'square', 0.05, 0.52); }
+  wheelie() { tone(200, 0.4, 'sawtooth', 0.05, 0, 500); tone(900, 0.12, 'square', 0.05, 0.4); tone(1200, 0.2, 'square', 0.05, 0.52); },
+  salto() { tone(260, 0.5, 'square', 0.04, 0, 900); }
 };
 const LEAD = [0, 4, 7, 4, 7, 11, 14, 11, 9, 12, 16, 12, 5, 9, 12, 9];
 const BASS = [0, 0, 7, 7, 9, 9, 5, 5];
@@ -292,35 +293,41 @@ function cyclist(sx, y, a) {
   rect(sx - 8, y - 20, 6, 4, a.shorts || '#2038ec'); rect(sx - 8, y - 20, 6, 1, '#fcfcfc');
   legK(0);
 }
-function swimmer(sx, y, a) {
-  const cyc = a.ph * 2.2 / (Math.PI * 2), suit = '#14141c', cap = a.col, uu = k => (((cyc + k * 0.5) % 1) + 1) % 1;
+function swimmer(sx, y, a, part) {
+  const cyc = a.ph * 2.2 / (Math.PI * 2), suit = '#14141c', sheen = '#2c3450', cap = a.cap || a.col, uu = k => (((cyc + k * 0.5) % 1) + 1) % 1;
   const br = Math.floor(cyc) % 3 === 0 && uu(0) > 0.55 && uu(0) < 0.95;          // om de 3 slagen even ademhalen
-  const leg = k => {                                                          // beenslag
-    const lift = Math.sin(a.ph * 9 + k * Math.PI) * 2.2, c = k ? SKIN_D : SKIN;
-    thick(sx - 13, y - 2, sx - 24, y - 1 + lift, 2, c); rect(sx - 27, y - 2 + lift, 4, 2, c);
-    if (lift < -1) { px(sx - 29 + (Math.floor(a.ph * 9) % 3), y - 4 + lift, '#fcfcfc'); px(sx - 25, y - 5 + lift, '#a8d8f8'); }
-  };
-  const arm = k => {                                                          // crawl: onder water trekken, hoge elleboog boven water
+  const arms = [0, 1].map(k => {                                              // crawl: onder water trekken, hoge elleboog boven water
     const u = uu(k), S = [sx + 1, y - 5]; let hx, hy;
     if (u < 0.5) { const v = u / 0.5; hx = S[0] + 11 - 19 * v; hy = y + 3 + Math.sin(v * Math.PI) * 2; }
     else { const v = (u - 0.5) / 0.5; hx = S[0] - 8 + 19 * v; hy = y - 3 - Math.sin(v * Math.PI) * 9; }
-    const e = ik(S[0], S[1], hx, hy, 6, 6, u < 0.5 ? (hx >= S[0] ? -1 : 1) : (hx >= S[0] ? 1 : -1)), c = k ? SKIN_D : SKIN;
-    thick(S[0], S[1], e[0], e[1], 3, c); thick(e[0], e[1], e[2], e[3], 2, c); rect(e[2] - 1, e[3] - 1, 3, 3, c);
-    if (Math.min(u, Math.abs(u - 0.5), 1 - u) < 0.07) { rect(e[2] - 2, y - 1, 5, 1, '#fcfcfc'); px(e[2], y - 3, '#fcfcfc'); px(e[2] + 2, y - 2, '#a8d8f8'); }
+    return { u, S, e: ik(S[0], S[1], hx, hy, 6, 6, u < 0.5 ? (hx >= S[0] ? -1 : 1) : (hx >= S[0] ? 1 : -1)) };
+  });
+  const drawArm = (A, c, hand) => { const e = A.e; thick(A.S[0], A.S[1], e[0], e[1], 4, c); thick(e[0], e[1], e[2], e[3], 3, c); if (hand) rect(e[2] - 1, e[3] - 1, 3, 3, hand); };
+  const leg = k => {                                                          // beenslag in wetsuit, met huidskleurige voet
+    const lift = Math.sin(a.ph * 9 + k * Math.PI) * 2.2;
+    thick(sx - 13, y - 2, sx - 24, y - 1 + lift, 3, suit); rect(sx - 27, y - 2 + lift, 4, 2, SKIN_D);
+    if (lift < -1) { px(sx - 29 + (Math.floor(a.ph * 9) % 3), y - 4 + lift, '#fcfcfc'); px(sx - 25, y - 5 + lift, '#a8d8f8'); }
   };
-  leg(1); leg(0); arm(1);
-  thick(sx - 14, y - 3, sx + 1, y - 5, 7, suit); rect(sx - 11, y - 8, 12, 1, '#2c2c3c'); rect(sx - 15, y - 6, 4, 7, shade(cap, 0.8));
+  if (part !== 'foam') {
+  for (const A of arms) drawArm(A, 'rgba(10,8,36,0.5)');                      // schaduw van de armen onder water
+  g.save(); g.beginPath(); g.rect(sx - 40, y - 60, 90, 60); g.clip();         // alles onder de waterlijn blijft verborgen
+  leg(1); leg(0); drawArm(arms[1], shade(suit, 0.8), SKIN_D);
+  thick(sx - 14, y - 3, sx + 1, y - 5, 8, suit); rect(sx - 12, y - 9, 11, 1, '#6a4a5a'); rect(sx - 12, y - 8, 12, 1, sheen); rect(sx - 7, y - 6, 1, 4, sheen);
   const hy = br ? y - 14 : y - 7;                                             // hoofd in het water, omhoog bij ademhalen
   if (a.girl) { const w = Math.round(Math.sin(a.ph * 4)); thick(sx, hy - 1, sx - 6, hy + 1 + w, 2, a.hair); }
-  rect(sx + 1, hy, 10, 10, SKIN); rect(sx, hy - 2, 11, 7, cap); rect(sx + 3, hy - 2, 1, 2, shade(cap, 1.3));
-  rect(sx + 6, hy + 3, 5, 3, '#101018'); px(sx + 7, hy + 4, '#80d0f8'); px(sx + 9, hy + 4, '#80d0f8');
-  px(sx + 11, hy + 5, SKIN_D); rect(sx + 9, hy + 6, 2, 1, '#f8a0a0');
-  if (br) { rect(sx + 8, hy + 7, 3, 3, '#702020'); px(sx + 13, hy + 3, '#fcfcfc'); px(sx + 14, hy + 6, '#a8d8f8'); px(sx + 13, hy + 9, '#fcfcfc'); }
-  else rect(sx + 7, hy + 8, 3, 1, '#a04030');
-  arm(0);
-  rect(sx - 22, y, 46, 12, LOCS[LOC].tint);
-  for (let k = 0; k < 20; k++) { const t = k / 20 * Math.PI * 2; px(sx + 4 + Math.cos(t) * 13, y + 2 + Math.sin(t) * 3, '#a8d8f8'); }
-  rect(sx + 9, y - 1, 5, 1, '#fcfcfc'); rect(sx - 19, y, 7, 1, '#fcfcfc'); rect(sx - 16, y + 1, 4, 1, '#a8d8f8');
+  rect(sx + 1, hy, 10, 10, SKIN); rect(sx, hy - 2, 11, 7, cap); rect(sx + 3, hy - 2, 1, 2, shade(cap, 1.3)); rect(sx + 1, hy - 3, 9, 1, shade(cap, 0.85));
+  rect(sx + 1, hy + 3, 5, 1, '#101018'); rect(sx + 6, hy + 2, 6, 4, '#101018'); px(sx + 7, hy + 3, '#80d0f8'); px(sx + 10, hy + 3, '#80d0f8');
+  px(sx + 11, hy + 6, SKIN_D); rect(sx + 9, hy + 7, 2, 1, '#f8a0a0');
+  if (br) { rect(sx + 8, hy + 8, 3, 2, '#702020'); px(sx + 13, hy + 3, '#fcfcfc'); px(sx + 14, hy + 6, '#a8d8f8'); px(sx + 13, hy + 9, '#fcfcfc'); }
+  drawArm(arms[0], suit, SKIN); rect(arms[0].e[0] - 1, arms[0].e[1] - 1, 2, 1, sheen);
+  g.restore();
+  }
+  if (part === 'body') return;
+  const f1 = '#5ab4dc', f2 = '#a8e0f4', f3 = '#fcfcfc', ph = T * 0.6;         // schuimring rond het lichaam, boeggolf en kielzog
+  for (let k = 0; k < 30; k++) { const t = k / 30 * Math.PI * 2 + ph * 0.2; px(sx - 2 + Math.cos(t) * 25, y + 1 + Math.sin(t) * 4.5, k % 3 === 0 ? f3 : k % 2 ? f2 : f1); }
+  for (let k = 0; k < 18; k++) { const t = k / 18 * Math.PI * 2 - ph * 0.3; px(sx + 2 + Math.cos(t) * 16, y + 2 + Math.sin(t) * 2.8, k % 2 ? f1 : f2); }
+  rect(sx + 9, y - 1, 6, 2, f3); rect(sx + 8, y + 1, 8, 1, f2); rect(sx - 27, y, 10, 1, f3); rect(sx - 24, y + 1, 7, 1, f2);
+  for (const A of arms) if (Math.min(A.u, Math.abs(A.u - 0.5), 1 - A.u) < 0.07) { rect(A.e[2] - 2, y - 1, 5, 1, f3); px(A.e[2], y - 3, f3); px(A.e[2] + 2, y - 2, f2); }
   if (!br) for (let k = 0; k < 2; k++) px(sx + 13 + k * 3, y + 6 - ((a.ph * 6 + k * 4) % 8), '#d8f0ff');
 }
 
@@ -434,20 +441,27 @@ function bgSwim() {
     rect(bx - 4, by - 23, 228, 7, '#b8281c'); rect(bx - 4, by - 23, 228, 1, '#e04838');
     for (const gx of [30, 120, 190]) for (let r = 0; r < 8; r++) rect(bx + gx + 7 - r, by - 31 + r, 2 * r + 2, 1, '#b8281c');
     for (let k = 0; k < 19; k++) { rect(bx + 4 + k * 11, by - 10, 2, 10, '#c8c0b8'); rect(bx + 7 + k * 11, by - 14, 4, 3, '#7a4a3a'); }
-    rect(bx + 84, by - 15, 48, 8, '#6a2a20'); text('ALOHA HOTEL', bx + 86, by - 13, '#fcfcfc');
+    rect(bx + 84, by - 15, 48, 8, '#6a2a20'); text('KONA INN', bx + 93, by - 13, '#fcfcfc');
   });
   rect(0, hz - 2, W, 4, '#0c1a14');
-  bands(['#f0602c', '#d84826', '#b03420', '#8a2420', '#601c28', '#3c1830', '#241638'], hz + 2, 66);
-  const rip = ['#ffb060', '#ffa050', '#f88a40', '#e07030', '#c05830', '#a04630', '#7c3a38', '#5c3040'];
-  for (let k = 0; k < 8; k++) {
-    const y = Math.round(hz + 4 + k * k * 0.45 + k * 3.5);
-    each(9 + k * 3, 0.2 + k * 0.12, (x, i) => { if (rnd(i * 5 + k) > 0.35) rect(x, y, 4 + k, 1, rip[k]); if (rnd(i * 9 + k) > 0.6) rect(x + 3, y + 1, 3 + k, 1, '#2a1030'); });
+  bands(['#f46a2a', '#e04c24', '#b83a28', '#7c2c38', '#4a2448', '#2c2050', '#181438'], hz + 2, 54);
+  for (let k = 0; k < 12; k++) {                  // horizontale pixelstreepjes: donker op het oranje water, oranje op het donkere
+    const y = Math.round(hz + 4 + k * 4.4), up = k < 5, len = 5 + k * 2;
+    each(10 + k * 3, 0.2 + k * 0.08, (x, i) => {
+      if (rnd(i * 5 + k) > 0.45) rect(x, y, len, 1, up ? '#7a2048' : '#f07838');
+      if (rnd(i * 9 + k) > 0.7) rect(x + 4, y + 2, len - 2, 1, up ? '#ffc070' : '#3a2a60');
+    });
   }
   each(420, 1, (x, i) => {                         // gele boei
     if (rnd(i + 3) <= 0.3) return;
     const bx = x + 120, by = 146;
-    rect(bx - 1, by - 30, 20, 32, '#403000'); rect(bx, by - 29, 18, 30, '#f8d800'); rect(bx + 14, by - 29, 4, 30, '#d8a800');
-    rect(bx + 3, by - 22, 12, 10, '#d82800'); text('1', bx + 6, by - 20, '#fcfcfc', 2); rect(bx - 6, by + 1, 30, 2, 'rgba(255,255,255,0.7)');
+    rect(bx, by - 31, 20, 33, '#403000'); rect(bx + 2, by - 33, 16, 2, '#403000');
+    rect(bx + 1, by - 30, 18, 31, '#f8d800'); rect(bx + 2, by - 31, 16, 1, '#fce868'); rect(bx + 1, by - 30, 3, 31, '#fce868');
+    rect(bx + 14, by - 30, 5, 31, '#d8a800'); rect(bx + 17, by - 30, 2, 31, '#b88800');
+    rect(bx + 4, by - 24, 12, 13, '#d82800'); spr(['....w....', '...www...', '..wwwww..', '.wwwwwww.', 'wwwwwwwww'], { w: '#fcfcfc' }, bx + 5, by - 20);
+    rect(bx + 15, by - 34, 9, 8, '#d82800'); text('1', bx + 18, by - 32, '#fcfcfc');
+    rect(bx + 2, by + 2, 16, 2, 'rgba(0,0,0,0.25)');
+    for (let k = 0; k < 28; k++) { const t = k / 28 * Math.PI * 2 + T * 0.4; px(bx + 10 + Math.cos(t) * 21, by + 1 + Math.sin(t) * 4, k % 3 === 0 ? '#fcfcfc' : k % 2 ? '#a8e0f4' : '#5ab4dc'); }
   });
   for (let i = 0; i < 3; i++) each(10, 1, (x, j) => rect(x, LANES[i] + 6, 3, 2, j % 2 ? '#fc4c30' : '#fcfcfc'));
 }
@@ -548,6 +562,29 @@ function skyline(f, base, col, win, seed) {
   });
 }
 function duck(x, y) { spr(DUCK, { y: '#fcd800', k: '#202030', o: '#f88020' }, x, y + Math.round(Math.sin(T * 2 + x * 0.05))); }
+const BUOY = {                                     // boei per omgeving: hoofdkleur, licht, schaduw, donker, rand, embleem, driehoek, label
+  ffm: { body: '#f88020', light: '#fcb060', shade: '#d86010', dark: '#a84808', edge: '#402800', em: '#fcfcfc', tri: '#f88020', tag: '#1850b0' },
+  gb: { body: '#f8d800', light: '#fce868', shade: '#d8a800', dark: '#b88800', edge: '#202020', em: '#181818', tri: '#f8d800', tag: '#181818' },
+  kr: { body: '#f88020', light: '#fcb060', shade: '#d86010', dark: '#a84808', edge: '#402800', em: '#d82020', tri: '#fcfcfc', tag: '#d82020' }
+};
+function buoy(bx, by, p) {
+  rect(bx, by - 31, 20, 33, p.edge); rect(bx + 2, by - 33, 16, 2, p.edge);
+  rect(bx + 1, by - 30, 18, 31, p.body); rect(bx + 2, by - 31, 16, 1, p.light); rect(bx + 1, by - 30, 3, 31, p.light);
+  rect(bx + 14, by - 30, 5, 31, p.shade); rect(bx + 17, by - 30, 2, 31, p.dark);
+  rect(bx + 4, by - 24, 12, 13, p.em); spr(['....w....', '...www...', '..wwwww..', '.wwwwwww.', 'wwwwwwwww'], { w: p.tri }, bx + 5, by - 20);
+  rect(bx + 15, by - 34, 9, 8, p.tag); text('1', bx + 18, by - 32, '#fcfcfc');
+  rect(bx + 2, by + 2, 16, 2, 'rgba(0,0,0,0.25)');
+  for (let k = 0; k < 28; k++) { const t = k / 28 * Math.PI * 2 + T * 0.4; px(bx + 10 + Math.cos(t) * 21, by + 1 + Math.sin(t) * 4, k % 3 === 0 ? '#fcfcfc' : k % 2 ? '#a8e0f4' : '#5ab4dc'); }
+}
+function waterStreaks(hz, upA, upB, loA, loB) {   // horizontale pixelstreepjes die per omgeving van kleur wisselen
+  for (let k = 0; k < 12; k++) {
+    const y = Math.round(hz + 4 + k * 4.4), up = k < 5, len = 5 + k * 2;
+    each(10 + k * 3, 0.2 + k * 0.08, (x, i) => {
+      if (rnd(i * 5 + k) > 0.45) rect(x, y, len, 1, up ? upA : loA);
+      if (rnd(i * 9 + k) > 0.7) rect(x + 4, y + 2, len - 2, 1, up ? upB : loB);
+    });
+  }
+}
 function bgSwimF() {
   const hz = 124;
   bands(['#4a9cf0', '#6cb4f8', '#90ccfc', '#b4e0fc', '#d8f0fc', '#f8f4d8'], 0, hz);
@@ -559,17 +596,12 @@ function bgSwimF() {
   each(18, 0.14, (x, i) => fir(x, hz + 1, 18 + (rnd(i + 9) * 16 | 0), '#2a7040', '#3a9054'));
   rect(0, hz, W, 3, '#d8c890');
   bands(['#3c9cc8', '#3490c0', '#2c80b0', '#2470a0', '#1c6090', '#185080'], hz + 3, H - hz - 3);
-  const rip = ['#d0f0fc', '#c0e8fc', '#b0e0fc', '#98d0f4', '#80c0e8', '#68b0dc', '#50a0d0', '#4090c4'];
-  for (let k = 0; k < 8; k++) {
-    const y = Math.round(hz + 5 + k * k * 0.45 + k * 3.5);
-    each(9 + k * 3, 0.2 + k * 0.12, (x, i) => { if (rnd(i * 5 + k) > 0.35) rect(x, y, 4 + k, 1, rip[k]); });
-  }
+  waterStreaks(hz, '#a8dcf4', '#1c6090', '#4a98c4', '#0c3050');
   each(300, 0.9, (x, i) => { if (rnd(i + 4) > 0.3) duck(x, 130 + (rnd(i) * 8 | 0)); });
   each(420, 1, (x, i) => {                         // oranje boei
     if (rnd(i + 3) <= 0.3) return;
     const bx = x + 120, by = 146;
-    rect(bx - 1, by - 30, 20, 32, '#402800'); rect(bx, by - 29, 18, 30, '#f88020'); rect(bx + 14, by - 29, 4, 30, '#d86010');
-    rect(bx + 3, by - 22, 12, 10, '#fcfcfc'); text('1', bx + 6, by - 20, '#d86010', 2); rect(bx - 6, by + 1, 30, 2, 'rgba(255,255,255,0.7)');
+    buoy(bx, by, BUOY.ffm);
   });
   for (let i = 0; i < 3; i++) each(10, 1, (x, j) => rect(x, LANES[i] + 6, 3, 2, j % 2 ? '#f88020' : '#fcfcfc'));
 }
@@ -786,14 +818,12 @@ function bgSwimG() {
   each(700, 0.25, (x, i) => { if (rnd(i + 9) > 0.3) mannekenPis(x + 150, hz + 3); });
   rect(0, hz - 2, W, 6, '#6a7a58');
   bands(['#5e7e6a', '#58786a', '#527266', '#4c6c62', '#46665e', '#406058'], hz + 4, H - hz - 4);
-  const rip = ['#c8dcc8', '#b0ccb4', '#9ab8a0', '#88a890', '#789880', '#688870', '#587860', '#486850'];
-  for (let k = 0; k < 8; k++) { const y = Math.round(hz + 5 + k * k * 0.45 + k * 3.5); each(9 + k * 3, 0.2 + k * 0.12, (x, i) => { if (rnd(i * 5 + k) > 0.35) rect(x, y, 4 + k, 1, rip[k]); }); }
+  waterStreaks(hz, '#b0ccb4', '#406058', '#5a8a78', '#1c3a34');
   each(300, 0.9, (x, i) => { if (rnd(i + 4) > 0.3) duck(x, 130 + (rnd(i) * 8 | 0)); });
   each(420, 1, (x, i) => {
     if (rnd(i + 3) <= 0.3) return;
     const bx = x + 120, by = 146;
-    rect(bx - 1, by - 30, 20, 32, '#202020'); rect(bx, by - 29, 18, 30, '#f8d800'); rect(bx + 14, by - 29, 4, 30, '#d8a800');
-    rect(bx + 3, by - 22, 12, 10, '#181818'); text('1', bx + 6, by - 20, '#f8d800', 2); rect(bx - 6, by + 1, 30, 2, 'rgba(255,255,255,0.7)');
+    buoy(bx, by, BUOY.gb);
   });
   for (let i = 0; i < 3; i++) each(10, 1, (x, j) => rect(x, LANES[i] + 6, 3, 2, j % 2 ? '#181818' : '#f8d800'));
 }
@@ -876,14 +906,12 @@ function bgSwimK() {
   each(14, 0.14, (x, i) => fir(x, hz + 1, 16 + (rnd(i + 5) * 14 | 0), '#2a6a3a', '#3a8a4a'));
   rect(0, hz, W, 3, '#d8c890');
   bands(['#3a9cb8', '#3490b0', '#2c80a0', '#247090', '#1c6080', '#185070'], hz + 3, H - hz - 3);
-  const rip = ['#d0f0fc', '#c0e8fc', '#b0e0fc', '#98d0f4', '#80c0e8', '#68b0dc', '#50a0d0', '#4090c4'];
-  for (let k = 0; k < 8; k++) { const y = Math.round(hz + 5 + k * k * 0.45 + k * 3.5); each(9 + k * 3, 0.2 + k * 0.12, (x, i) => { if (rnd(i * 5 + k) > 0.35) rect(x, y, 4 + k, 1, rip[k]); }); }
+  waterStreaks(hz, '#a8e0ec', '#185070', '#3a90a8', '#0c3848');
   each(360, 0.5, (x, i) => { if (rnd(i + 5) > 0.3) sailboat(x + 40, 134); });
   each(420, 1, (x, i) => {
     if (rnd(i + 3) <= 0.3) return;
     const bx = x + 120, by = 146;
-    rect(bx - 1, by - 30, 20, 32, '#402800'); rect(bx, by - 29, 18, 30, '#f88020'); rect(bx + 14, by - 29, 4, 30, '#d86010');
-    rect(bx + 3, by - 22, 12, 10, '#fcfcfc'); text('1', bx + 6, by - 20, '#d86010', 2); rect(bx - 6, by + 1, 30, 2, 'rgba(255,255,255,0.7)');
+    buoy(bx, by, BUOY.kr);
   });
   for (let i = 0; i < 3; i++) each(10, 1, (x, j) => rect(x, LANES[i] + 6, 3, 2, j % 2 ? '#f88020' : '#fcfcfc'));
 }
@@ -941,19 +969,19 @@ const saveProfile = () => { try { localStorage.setItem('triathlonProfile', JSON.
 
 function newRace() {
   best = 0; try { best = +localStorage.getItem(bestKey()) || 0; } catch (e) { /* opslaan niet beschikbaar */ }
-  P = { name: PROFILE.name || 'SPELER', girl: PROFILE.girl, bike: 'px', shorts: '#16161e', bshoe: '#e02020', col: '#d82800', hair: PROFILE.girl ? '#a05820' : '#503000', dist: 0, speed: 0, ph: 0, energy: 100, time: 0, trReal: 0, trList: [], stage: 0, jt: 0, jcd: 0, hitCd: 0, hitT: 0, wheelie: 0,
+  P = { name: PROFILE.name || 'SPELER', girl: PROFILE.girl, bike: 'px', shorts: '#16161e', bshoe: '#e02020', col: '#d82800', hair: PROFILE.girl ? '#a05820' : '#503000', dist: 0, speed: 0, ph: 0, energy: 100, time: 0, trReal: 0, trList: [], stage: 0, jt: 0, jcd: 0, hitCd: 0, hitT: 0, wheelie: 0, salto: false,
         splits: [], clicks: [], flash: null, rank: 1, pr: false, half: [false, false, false] };
   RIV = [
-    { name: 'HAAS', col: '#f87820', hair: '#503000', base0: 1.22, nap: true, shorts: '#2038ec' },
-    { name: 'SCHILDPAD', col: '#00a800', hair: '#6a3a18', girl: true, base0: 0.93, shorts: '#1a5a2a' },
-    { name: 'BOB', col: '#2038ec', hair: '#e8c050', base0: 1.02, shorts: '#181830' }
+    { name: 'HAAS', col: '#f87820', hair: '#503000', base0: 1.22, nap: true, shorts: '#2038ec', cap: '#fcfcfc' },
+    { name: 'SCHILDPAD', col: '#00a800', hair: '#6a3a18', girl: true, base0: 0.93, shorts: '#1a5a2a', cap: '#f8d800' },
+    { name: 'BOB', col: '#2038ec', hair: '#e8c050', base0: 1.02, shorts: '#181830', cap: '#fcfcfc' }
   ].map((r, i) => Object.assign(r, { dist: 0, speed: 0, ph: 0, ph0: i * 2.1, fin: null, napT: 0, napped: false, trd: [false, false], trT: 0 }));
   const NB = HALF ? [2, 7, 4] : [3, 13, 8]; BOTTLES = [];
   for (let s = 0; s < 3; s++) for (let k = 0; k < NB[s]; k++) BOTTLES.push({ d: STARTS[s] + LEN[s] * (k + 1) / (NB[s] + 1), got: false });
   HAZ = [];                                           // obstakels liggen tussen de flesjes in
   for (let s = 0; s < 3; s++) { const n = NB[s] + 1; for (let k = 0; k < n; k++) HAZ.push({ d: STARTS[s] + LEN[s] * (k + 0.5) / n, hit: false, i: HAZ.length }); }
   FR = [[0, 0.5], [1, 0.2], [1, 0.5], [1, 0.8], [2, 0.4], [2, 0.8]].map(([s, f]) => ({ d: STARTS[s] + LEN[s] * f, nextT: 0, shoutT: 0 }));
-  floats = []; parts = []; confetti = []; tr = null;
+  floats = []; parts = []; confetti = []; tr = null; puffs = [];
 }
 newRace();
 
@@ -972,13 +1000,17 @@ function start() {
 }
 function jump() {
   if (mode !== 'race' || P.jt > 0 || P.jcd > 0) return;
-  P.jt = JT; P.energy = Math.max(0, P.energy - 2); sfx.jump();
+  P.jt = JT; P.energy = Math.max(0, P.energy - 2); sfx.jump(); if (P.salto && P.stage === 2) sfx.salto();
 }
 const codeBuf = [];
 function codeKey(c) {                              // geheime code: > < < > tijdens het fietsen = wheelie
-  const t = performance.now(); codeBuf.push({ c, t }); if (codeBuf.length > 4) codeBuf.shift();
-  if (mode === 'race' && P.stage === 1 && P.wheelie <= 0 && codeBuf.length === 4 && codeBuf.map(x => x.c).join('') === 'RLLR' && t - codeBuf[0].t < 3000) {
+  const t = performance.now(); codeBuf.push({ c, t }); if (codeBuf.length > 6) codeBuf.shift();
+  if (mode !== 'race') return;
+  const s = codeBuf.map(x => x.c).join('');
+  if (s.endsWith('RLLR') && P.stage === 1 && P.wheelie <= 0 && t - codeBuf[codeBuf.length - 4].t < 3000) {
     P.wheelie = WHEELIE_T; pop('WHEELIE!', '#fcd800'); sfx.wheelie(); codeBuf.length = 0;
+  } else if (s.endsWith('LLRLR') && t - codeBuf[codeBuf.length - 5].t < 4000) {   // salto-cheat: < < > < >, springen = salto tijdens het rennen
+    P.salto = !P.salto; pop(P.salto ? 'SALTO AAN!' : 'SALTO UIT!', '#fcd800'); sfx.wheelie(); codeBuf.length = 0;
   }
 }
 function press() {
@@ -1060,6 +1092,7 @@ function update(dt) {
   T += dt; keyFlash = Math.max(0, keyFlash - dt);
   floats.forEach(f => { f.life -= dt; f.y -= 18 * dt; }); floats = floats.filter(f => f.life > 0);
   FR.forEach(f => { f.shoutT = Math.max(0, f.shoutT - dt); });
+  puffs.forEach(p => { p.life -= dt; p.y += p.vy * dt; }); puffs = puffs.filter(p => p.life > 0);
   parts.forEach(p => { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 160 * dt; p.life -= dt; }); parts = parts.filter(p => p.life > 0);
   if (P.flash && (P.flash.life -= dt) <= 0) P.flash = null;
   if (mode === 'countdown') {
@@ -1077,6 +1110,8 @@ function update(dt) {
     P.speed = Math.min(14, P.speed * Math.exp(-(racing ? 1.5 : 3) * dt * (P.jt > 0 ? 0.3 : 1)));
     P.dist += P.speed * dt; if (!racing) P.dist = Math.min(P.dist, TOTAL + 10);
     P.ph += P.speed * dt;
+    P.puffT = (P.puffT || 0) - dt;
+    if (P.puffT <= 0 && P.stage > 0 && P.speed > 1.5 && P.jt <= 0) { P.puffT = 0.14 - Math.min(0.08, P.speed * 0.01); puffs.push({ d: P.dist - 0.6, y: LANES[3] - 1, life: 0.55, max: 0.55, r: 1 + Math.random() * 1.5, vy: -8 - Math.random() * 6 }); }
     if (P.jt > 0) { P.jt -= dt; if (P.jt <= 0) P.jcd = 0.12; } else if (P.jcd > 0) P.jcd -= dt;
     P.hitCd = Math.max(0, P.hitCd - dt); P.hitT = Math.max(0, P.hitT - dt); P.wheelie = Math.max(0, P.wheelie - dt);
     P.clicks = P.clicks.filter(t => t > T - 1);
@@ -1116,19 +1151,67 @@ function update(dt) {
 }
 
 // ---------- tekenen
+const OUT = { oc: null, sc: null, tc: null, hc: null, W: 130, H: 120, OX: 65, OY: 95 };
+const SOFT = { a: null, b: null };
+var puffs = [];
+function softly(fn) {                              // achtergrond iets vager en donkerder, zodat de sporters er beter uitspringen
+  if (!SOFT.a) { SOFT.a = document.createElement('canvas'); SOFT.a.width = W; SOFT.a.height = H; SOFT.b = document.createElement('canvas'); SOFT.b.width = 224; SOFT.b.height = 126; }
+  const keep = g, ga = SOFT.a.getContext('2d'); ga.clearRect(0, 0, W, H); g = ga; fn(); g = keep;
+  const gb = SOFT.b.getContext('2d'); gb.imageSmoothingEnabled = true; gb.drawImage(SOFT.a, 0, 0, 224, 126);
+  g.imageSmoothingEnabled = true; g.drawImage(SOFT.b, 0, 0, W, H); g.imageSmoothingEnabled = false;
+  rect(0, 0, W, H, 'rgba(24,12,48,0.16)');
+}
+function drawPuffs() {                             // stofwolkjes achter de speler, blijven op hun plek in de wereld liggen
+  for (const p of puffs) { const k = p.life / p.max; g.globalAlpha = 0.5 * k; circ(Math.round(PX0 + (p.d - P.dist) * PXU), Math.round(p.y), Math.max(1, Math.round(p.r * (2 - k))), '#d8c8b0'); }
+  g.globalAlpha = 1;
+}
+function outlined(draw, sx, y, halo) {                   // tekent een sporter met een donkere rand van 1 pixel eromheen
+  if (!OUT.oc) for (const k of ['oc', 'sc', 'tc', 'hc']) { OUT[k] = document.createElement('canvas'); OUT[k].width = OUT.W; OUT[k].height = OUT.H; }
+  const keep = g, oc = OUT.oc.getContext('2d'), sc = OUT.sc.getContext('2d'), X = Math.round(sx), Y = Math.round(y);
+  oc.clearRect(0, 0, OUT.W, OUT.H); oc.save(); oc.translate(OUT.OX - X, OUT.OY - Y);
+  g = oc; draw(X, Y); g = keep; oc.restore();
+  sc.globalCompositeOperation = 'source-over'; sc.clearRect(0, 0, OUT.W, OUT.H); sc.drawImage(OUT.oc, 0, 0);
+  sc.globalCompositeOperation = 'source-in'; sc.fillStyle = '#0c0818'; sc.fillRect(0, 0, OUT.W, OUT.H);
+  const ox = X - OUT.OX, oy = Y - OUT.OY;
+  if (halo) {                                      // lichte gloed rond de speler, zodat je jezelf makkelijk terugvindt
+    const hc = OUT.hc.getContext('2d'); hc.globalCompositeOperation = 'source-over'; hc.clearRect(0, 0, OUT.W, OUT.H); hc.drawImage(OUT.oc, 0, 0);
+    hc.globalCompositeOperation = 'source-in'; hc.fillStyle = halo; hc.fillRect(0, 0, OUT.W, OUT.H);
+    g.globalAlpha = 0.55; for (const [dx, dy] of [[-2, 0], [2, 0], [0, -2], [0, 2], [-2, -2], [2, -2], [-2, 2], [2, 2], [-3, 0], [3, 0], [0, -3], [0, 3]]) g.drawImage(OUT.hc, ox + dx, oy + dy); g.globalAlpha = 1;
+  }
+  for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) g.drawImage(OUT.sc, ox + dx, oy + dy);
+  g.drawImage(OUT.oc, ox, oy);
+  const tc = OUT.tc.getContext('2d'), edge = (dx, dy, col, al) => {   // lichtrand linksboven en schaduwrand rechtsonder
+    tc.globalCompositeOperation = 'source-over'; tc.clearRect(0, 0, OUT.W, OUT.H); tc.drawImage(OUT.oc, 0, 0);
+    tc.globalCompositeOperation = 'destination-out'; tc.drawImage(OUT.oc, dx, dy);
+    tc.globalCompositeOperation = 'source-in'; tc.fillStyle = col; tc.fillRect(0, 0, OUT.W, OUT.H);
+    g.globalAlpha = al; g.drawImage(OUT.tc, ox, oy); g.globalAlpha = 1;
+  };
+  edge(1, 1, '#fff2c8', 0.7); edge(-1, -1, '#10082c', 0.35);
+}
 function drawAthlete(a, lane, isP) {
-  const sx = PX0 + (a.dist - P.dist) * PXU; if (sx < -40 || sx > W + 40) return;
+  const sx = Math.round(PX0 + (a.dist - P.dist) * PXU); if (sx < -40 || sx > W + 40) return;
   const st = stageAt(a.dist), y = LANES[lane] - (isP ? jumpH() : 0), wait = a.trT > 0;
-  if (st > 0) rect(sx - 10, LANES[lane], 20, 2, 'rgba(0,0,0,0.35)');
-  if (wait) runner(sx, y, { col: a.col, hair: a.hair, girl: a.girl, shorts: a.shorts, bshoe: a.bshoe, ph: T * 0.3, stand: true, head: st === 1 ? 'cap' : 'helmet', shoes: st === 1 ? 'none' : 'bike' });
-  else if (st === 0) swimmer(sx, y, a);
+  if (st > 0) { rect(sx - 12, LANES[lane], 24, 1, 'rgba(0,0,0,0.3)'); rect(sx - 9, LANES[lane] + 1, 18, 1, 'rgba(0,0,0,0.3)'); rect(sx - 5, LANES[lane] + 2, 10, 1, 'rgba(0,0,0,0.25)'); }
+  if (wait) outlined((X, Y) => runner(X, Y, { col: a.col, hair: a.hair, girl: a.girl, shorts: a.shorts, bshoe: a.bshoe, ph: T * 0.3, stand: true, head: st === 1 ? 'cap' : 'helmet', shoes: st === 1 ? 'none' : 'bike' }), sx, y, isP ? '#ffe36a' : null);
+  else if (st === 0) { outlined((X, Y) => swimmer(X, Y, a, 'body'), sx, y, isP ? '#ffe36a' : null); swimmer(sx, y, a, 'foam'); }
   else if (st === 1) {
     if (isP && P.wheelie > 0) {                      // wheelie: op het achterwiel
-      const e = Math.min(1, Math.sin(Math.PI * (1 - P.wheelie / WHEELIE_T)) * 2.5), pv = sx - 13;
-      g.save(); g.translate(pv, y); g.rotate(-0.75 * e); g.translate(-pv, -y); cyclist(sx, y, a); g.restore();
-    } else cyclist(sx, y, a);
-  } else runner(sx, y, a);
+      const e = Math.min(1, Math.sin(Math.PI * (1 - P.wheelie / WHEELIE_T)) * 2.5);
+      outlined((X, Y) => { g.save(); g.translate(X - 13, Y); g.rotate(-0.75 * e); g.translate(-(X - 13), -Y); cyclist(X, Y, a); g.restore(); }, sx, y, isP ? '#ffe36a' : null);
+    } else outlined((X, Y) => cyclist(X, Y, a), sx, y, isP ? '#ffe36a' : null);
+  } else outlined((X, Y) => {
+    if (isP && P.salto && P.jt > 0) {                // salto: één keer rond de lengteas tijdens de sprong
+      const p = Math.min(1, (1 - P.jt / JT) / 0.85), cy = Y - 12;
+      g.save(); g.translate(X, cy); g.rotate(-2 * Math.PI * p); g.translate(-X, -cy); runner(X, Y, a); g.restore();
+    } else runner(X, Y, a);
+  }, sx, y, isP ? '#ffe36a' : null);
   const ty = y - (wait ? 40 : [28, 54, 40][st]);
+  if (isP && P.speed > 4.5 && st > 0) {            // windstrepen bij hoge snelheid
+    g.globalAlpha = Math.min(0.5, (P.speed - 4.5) * 0.08);
+    for (let k = 0; k < 4; k++) rect(sx - 44 - ((T * 90 + k * 23) % 20 | 0) - k * 3, y - 6 - k * 9 + ((T * 30 + k * 7) % 3 | 0), 16 + k * 3, 1, '#ffffff');
+    g.globalAlpha = 1;
+  }
+  if (isP && mode === 'race' && P.energy < 25) for (let k = 0; k < 3; k++) { const t = (T * 3 + k * 0.33) % 1; rect(sx + 6 + k * 4 + t * 7, ty + 10 + t * 12, 1, 2, '#8ad8ff'); }   // zweetdruppels als je moe bent
   if (isP) { const b = Math.round(Math.sin(T * 8)); rect(sx - 2, ty + 7 + b, 5, 1, '#fcd800'); rect(sx - 1, ty + 8 + b, 3, 1, '#fcd800'); px(sx, ty + 9 + b, '#fcd800'); stext(a.name, Math.round(sx - tw(a.name) / 2), ty, '#fcd800'); }
   else {
     stext(a.name, Math.round(sx - tw(a.name) / 2), ty + 4, '#fcfcfc');
@@ -1164,8 +1247,8 @@ function drawHazards() {
     if (!h.hit && ah > 0.8 && ah < 5.5 && (T * 5 | 0) % 2 === 0) stext('SPRING!', Math.round(sx - tw('SPRING!') / 2), y0 - 32, '#fc4030');
   }
 }
-function drawWorld() {
-  CAM = P.dist * PXU;
+function drawWorld() { CAM = P.dist * PXU; softly(drawStages); }
+function drawStages() {
   const starts = [0, B1, B2, TOTAL], fns = BGS[LOC];
   for (let s = 0; s < 3; s++) {
     const x0 = s === 0 ? -2000 : PX0 + (starts[s] - P.dist) * PXU, x1 = s === 2 ? 2000 : PX0 + (starts[s + 1] - P.dist) * PXU;
@@ -1220,7 +1303,7 @@ function drawItem(it, cx, cy, col) {
   spr(d.rows, pal, cx - d.rows[0].length, cy - d.rows.length, false, 2);
 }
 function drawTransition() {
-  CAM = 0; bgTrans();
+  CAM = 0; softly(bgTrans);
   const GY = 158, k = tr.k, ph = tr.phase, t = tr.t;
   rect(34, 140, 80, 4, '#8a5a30'); rect(34, 140, 80, 1, '#b8844c'); rect(38, 144, 3, 14, '#5a3a20'); rect(106, 144, 3, 14, '#5a3a20');
   for (const it in tr.table) if (tr.table[it]) drawItem(it, REST[it][0], REST[it][1], k === 0 ? '#2038ec' : '#fcfcfc');
@@ -1404,7 +1487,7 @@ function render() {
   gate(0, 'START', '#2038ec'); gate(B1, 'WISSEL 1', '#00a800'); gate(B2, 'WISSEL 2', '#a85010'); gate(TOTAL, 'FINISH', '#d82800');
   drawFrancas();
   RIV.forEach((r, i) => drawAthlete(r, i, false));
-  drawBottles(); drawHazards();
+  drawBottles(); drawHazards(); drawPuffs();
   drawAthlete(P, 3, true);
   drawHud(); drawFloats();
   if (mode === 'countdown') {
@@ -1470,7 +1553,7 @@ addEventListener('pointerdown', e => {
   if (mode === 'profile') { profileTap(fx * W, fy * H); return; }
   if (mode === 'select') { sel = Math.max(0, Math.min(LOC_KEYS.length - 1, Math.floor((fx * W - 6) / 78))); goLevel(); }
   else if (mode === 'level') { DIFF = Math.max(0, Math.min(DIFFS.length - 1, Math.floor((fx * W - 6) / 78))); start(); }
-  else if (mode === 'race') { if (TOUCH && fx < 0.3) jump(); else press(); }
+  else if (mode === 'race') { if (TOUCH && fx < 0.3) { jump(); codeKey('L'); } else { press(); codeKey('R'); } }
   else confirm();
 });
 function swipeEnd(e) {                              // swipe omhoog = springen, swipe rechts/links = > en < voor de geheime code
@@ -1478,7 +1561,7 @@ function swipeEnd(e) {                              // swipe omhoog = springen, 
   if (!s || mode !== 'race') return;
   const dx = e.clientX - s.x, dy = e.clientY - s.y;
   if (performance.now() - s.t > 600 || Math.max(Math.abs(dx), Math.abs(dy)) < 40) return;
-  if (Math.abs(dy) > Math.abs(dx)) { if (dy < 0) jump(); } else codeKey(dx > 0 ? 'R' : 'L');
+  if (Math.abs(dy) > Math.abs(dx) && dy < 0) jump();
 }
 addEventListener('pointerup', swipeEnd); addEventListener('pointercancel', swipeEnd);
 
